@@ -352,8 +352,10 @@ A run directory name is the command that reproduces it: `base_32node_s17_...` is
 
 ## Complete removal
 
-Ordered from what is yours alone to what the machine shares. The first two
-blocks are safe on a shared machine. The third is not.
+Ordered from what is yours alone to what the machine shares. The first part is
+safe on a shared machine. The second is not.
+
+### The repository and the environment
 
 **Confirm the experiment data exists somewhere else first.** `results/*/runs/`
 is the complete archive of every run. It is tracked in git, but only what has
@@ -385,11 +387,42 @@ and go with it. Other conda environments are untouched.
 
 **Stop here** if you simply do not want to run experiments any more.
 
-**Mininet and Open vSwitch are system packages, and everyone else on the machine
-uses the same copy.** To remove those as well, check that nobody else is using
-them first — commands and leftover state are in `README.md` §11.
+### Mininet and Open vSwitch
 
-Verify.
+> **These are system packages, and everyone else on the machine uses the same
+> copy.** Check that nobody else is using them first. Take whichever route
+> matches the one you used in step 2.
+
+**apt route**
+
+```bash
+sudo systemctl disable --now openvswitch-switch
+sudo apt purge mininet openvswitch-switch openvswitch-common \
+               openvswitch-pki openvswitch-testcontroller
+sudo apt autoremove
+```
+
+**Source route.** `install.sh` has no uninstall target, so the Mininet half is
+manual.
+
+```bash
+sudo rm -rf /usr/local/lib/python3.8/dist-packages/mininet \
+            /usr/local/lib/python3.8/dist-packages/mininet-*.dist-info
+sudo rm -f  /usr/local/bin/mn /usr/bin/mnexec
+```
+
+`install.sh -v` **installs Open vSwitch through apt**, so that half is identical
+to the block above — purge it the same way. The `src/mininet` clone lives under
+the repository and already went with `rm -rf ~/stride`.
+
+**Open vSwitch leftover state.** purge does not remove the database. It holds the
+bridge definitions, so delete it only if Open vSwitch is not wanted at all.
+
+```bash
+sudo rm -rf /etc/openvswitch /var/lib/openvswitch /var/log/openvswitch
+```
+
+### Verify
 
 ```bash
 command -v mn mnexec ovs-vsctl     # all three should print nothing

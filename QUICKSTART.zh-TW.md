@@ -318,7 +318,9 @@ run 的目錄名就是重現它的指令：`base_32node_s17_...` 等於 `STRIDE_
 
 ## 完全移除
 
-從只屬於你的排到大家共用的。前兩塊在共用機器上安全，第三塊不是。
+從只屬於你的排到大家共用的。第一段在共用機器上安全，第二段不是。
+
+### repo 與環境
 
 **先確認實驗資料還在別的地方。** `results/*/runs/` 是每次 run 的完整歸檔，有進 git，
 但只有推上去的部分才在別的地方。
@@ -347,10 +349,39 @@ Ryu、延遲 patch、§4 建立的 symlink 都在 env 裡面，一起消失。�
 
 **到這裡為止就夠了**，如果你只是不想再跑實驗。
 
-**Mininet 與 Open vSwitch 是系統套件，這台機器上的其他人也在用同一份。** 要連它們一起
-移除，先確認沒有別人在用，指令與各種殘留在 `README.zh-TW.md` §11。
+### Mininet 與 Open vSwitch
 
-驗證。
+> **這兩個是系統套件，這台機器上的其他人也在用同一份。** 先確認沒有別人在用。
+> 第 2 步走哪一條路線，這裡就走對應的那一條。
+
+**apt 路線**
+
+```bash
+sudo systemctl disable --now openvswitch-switch
+sudo apt purge mininet openvswitch-switch openvswitch-common \
+               openvswitch-pki openvswitch-testcontroller
+sudo apt autoremove
+```
+
+**原始碼路線。** `install.sh` 沒有 uninstall，Mininet 那部分要自己刪。
+
+```bash
+sudo rm -rf /usr/local/lib/python3.8/dist-packages/mininet \
+            /usr/local/lib/python3.8/dist-packages/mininet-*.dist-info
+sudo rm -f  /usr/local/bin/mn /usr/bin/mnexec
+```
+
+`install.sh` 的 `-v` 是**用 apt 裝 Open vSwitch** 的，所以 OVS 那半邊跟上面那段一模一樣，
+照著 purge。`src/mininet` 那個 clone 在 repo 底下，已經跟著 `rm -rf ~/stride` 走了。
+
+**Open vSwitch 的殘留狀態。** purge 不會刪資料庫，裡面是 bridge 定義，確定不再用 OVS
+才刪。
+
+```bash
+sudo rm -rf /etc/openvswitch /var/lib/openvswitch /var/log/openvswitch
+```
+
+### 驗證
 
 ```bash
 command -v mn mnexec ovs-vsctl     # 三個都不該有輸出
