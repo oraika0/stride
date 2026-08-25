@@ -10,8 +10,8 @@ A fresh clone can run all of it. The run archive under `results/*/runs/` is in t
 repository -- training logs, test sessions and checkpoints -- so the figures and
 tables rebuild without having to reproduce the experiments first.
 
-> **1-8 are once per machine; 9-12 are the loop you repeat per experiment.**
-> Steps 2 and 3 are alternatives -- pick the one matching your Ubuntu. Full
+> **1-7 are once per machine; 8-11 are the loop you repeat per experiment.**
+> Step 2 has two routes -- take the one matching your Ubuntu, not both. Full
 > explanations, and what lands where on a shared server, are in
 > [`README.md` §2](README.md).
 
@@ -36,25 +36,29 @@ Commands here and throughout this file assume the repository root as the working
 directory. Only the Mininet source install leaves it, and that one walks back by
 itself. `apt`, `conda` and `ln -s` do not care where you are; everything else does.
 
-## 2. Mininet + Open vSwitch (Ubuntu 24.04 and later)
+## 2. Mininet + Open vSwitch
 
-Distribution packages; do
-not run Mininet's `install.sh` here. **On a shared machine, look first** -- if both
-are present, skip these two lines: `apt install` will also upgrade an
-already-installed Open vSwitch and restart the service, cutting off anyone's
-running experiment.
+**Two routes; take the one matching your Ubuntu, not both.** Which one you take
+also decides one line in step 4, so remember which it was.
+
+### apt route -- Ubuntu 24.04 and later
+
+Distribution packages; do not run Mininet's `install.sh` here.
 
 ```bash
-dpkg -l mininet openvswitch-switch 2>/dev/null | grep ^ii   # both listed = already there, skip
 sudo apt install mininet openvswitch-switch
 sudo systemctl enable --now openvswitch-switch
+dpkg -l mininet openvswitch-switch | grep ^ii        # both listed = installed
 ```
 
-## 3. Mininet + Open vSwitch (Ubuntu 20.04)
+**On a shared machine, run that last line first.** If both are already there,
+skip the install: `apt install` upgrades an existing Open vSwitch and restarts
+the service, which cuts off anyone else's running experiment.
 
-From source. `-s` puts the dependency
-clones in `src/` alongside it rather than loose in `$HOME`, and has to come
-before `-n` and `-v`.
+### source route -- Ubuntu 20.04
+
+`-s` puts the dependency clones in `src/` alongside the repository rather than
+loose in `$HOME`, and has to come before `-n` and `-v`.
 
 ```bash
 git clone https://github.com/mininet/mininet src/mininet
@@ -66,7 +70,7 @@ The parentheses are deliberate: they keep the `cd` inside a subshell, so you are
 still at the repository root afterwards. `src/` is gitignored, so none of this
 gets committed.
 
-## 4. Python environment
+## 3. Python environment
 
 Both routes.
 
@@ -78,11 +82,11 @@ pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 \
 pip install -r requirements.txt
 ```
 
-## 5. Let the env see Mininet
+## 4. Let the env see Mininet
 
 apt installed it for the system Python 3.12, and a
 source install put it in the system `dist-packages` — either way the conda
-interpreter cannot see it. Pick the line matching your route:
+interpreter cannot see it. Take the line matching the route you took in step 2:
 
 ```bash
 # 24.04 (apt): link the one package in
@@ -92,7 +96,7 @@ ln -sfn /usr/lib/python3/dist-packages/mininet "$CONDA_PREFIX/lib/python3.8/site
 echo /usr/local/lib/python3.8/dist-packages > "$CONDA_PREFIX/lib/python3.8/site-packages/system_dist_packages.pth"
 ```
 
-## 6. Ryu, and the delay patch
+## 5. Ryu, and the delay patch
 
 **Install from git, not `pip install ryu`.** The last
 PyPI release (4.34, 2020) predates eventlet 0.30.3's breaking change, so `import
@@ -113,7 +117,7 @@ fetches for itself.
 The delay patch is what makes per-link latency measurable; **without it every link
 delay reads 0 and nothing raises.**
 
-## 7. Build the traffic scripts
+## 6. Build the traffic scripts
 
 Turns the pickled traffic matrices into the
 per-host iperf3 scripts Mininet replays, under
@@ -124,7 +128,7 @@ python dataset/prepare_dataset.py --topology 32node --tms 144tm
 python dataset/prepare_dataset.py --topology geant  --tms 24tm --tm_scale 3
 ```
 
-## 8. Check
+## 7. Check
 
 All three must pass.
 
@@ -138,7 +142,7 @@ The first must print a torch version and `True`, the second `PATCHED`. **Do not
 start training if the second fails** — without the patch every link delay reads 0
 and nothing tells you.
 
-## 9. Train
+## 8. Train
 
 **Give it a named window in the session from step 1.** The three processes then
 take a window each and the shell you started from stays free to look things up:
@@ -188,7 +192,7 @@ Ctrl-b [      scroll back (q to leave)
 The windows are named `controller` and `drl`. A window stays after its process
 exits (`remain-on-exit`), so **a crash stays on screen** instead of vanishing with
 the terminal -- the status line reads `Pane is dead (status N)`. Scroll the
-traceback with `Ctrl-b [`, then let step 10's `clean.sh` take the session away.
+traceback with `Ctrl-b [`, then let step 9's `clean.sh` take the session away.
 
 Without tmux, `--terminal gnome` opens a GUI window each and `--terminal inline`
 interleaves both into the current terminal.
@@ -220,7 +224,7 @@ sudo -E "$PY" main.py --env 32node_144tm_directed --alg ls2ic_dd train
 explicit assignment — `sudo -E` alone drops it, and a dropped value silently
 trains the default. `--seed` is an ordinary argument and cannot be dropped.
 
-## 10. Clean up between runs
+## 9. Clean up between runs
 
 ```bash
 ./scripts/clean.sh
@@ -231,7 +235,7 @@ misses the stuck orchestrator and does not verify the controller port was
 released — the next run then attaches to a stale frozen controller and produces a
 plausible but worthless curve, with no error anywhere.
 
-## 11. Test
+## 10. Test
 
 ```bash
 PY="$HOME/miniconda3/envs/stride/bin/python"
@@ -275,7 +279,7 @@ checkpoint it scored is knowable only from the sha256 in its `ckpt.txt`.
 Baselines with nothing to load (`ospf`, `ilp`, `widest_path`, `drsir`) are run
 without `--model` by design, and that directory shape is normal for them.
 
-## 12. Figures and tables
+## 11. Figures and tables
 
 ```bash
 PY="$HOME/miniconda3/envs/stride/bin/python"

@@ -58,7 +58,7 @@ the per-TM iperf3 script trees (`23node*/`, `32node_*tm/`, ~54 MB),
 notebooks. `NEW_Geant_s3_perhour/` was 507 MB that no config referenced; it was
 deleted from disk on 2026-08-19, and `utils/iperf3_geant.py` still rebuilds it.
 
-So a fresh clone runs step 7 of [`../QUICKSTART.md`](../QUICKSTART.md) and has
+So a fresh clone runs step 6 of [`../QUICKSTART.md`](../QUICKSTART.md) and has
 everything it needs.
 
 ## Scripts

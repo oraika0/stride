@@ -8,7 +8,7 @@
 乾淨 clone 可以跑完全部。`results/*/runs/` 底下的實驗歸檔在 repo 裡 —— 訓練 log、測試
 session、checkpoint 都在 —— 所以圖表不必先把實驗重跑一遍就能重建。
 
-> **1–8 每台機器做一次，9–12 是每次實驗的循環。** 第 2 與第 3 步二選一，
+> **1–7 每台機器做一次，8–11 是每次實驗的循環。** 第 2 步有兩條路線，二選一，
 > 看你的 Ubuntu 版本。完整說明、以及在共用機器上東西各自落在哪，見
 > [`README.zh-TW.md` §2](README.zh-TW.md)。
 
@@ -32,22 +32,27 @@ cd ~/stride
 底下（以及整份文件）的指令**預設 cwd 是 repo 根目錄** —— 只有 Mininet 那段會離開，
 所以它自己會走回來。`apt`、`conda`、`ln -s` 三個不在意你在哪，其餘都在意。
 
-## 2. Mininet + Open vSwitch（Ubuntu 24.04 以上）
+## 2. Mininet + Open vSwitch
 
-用發行版套件，不要跑 Mininet 的
-`install.sh`。**公用機器先看一眼是不是已經有了** —— 有的話跳過這兩行，因為
-`apt install` 會順手把已裝的 Open vSwitch 升級並重啟服務，別人正在跑的實驗會被打斷。
+**兩條路線，照你的 Ubuntu 選一條，不是兩條都做。** 選了哪一條也決定第 4 步要用哪一行，
+記著。
+
+### apt 路線 —— Ubuntu 24.04 以上
+
+用發行版套件，不要跑 Mininet 的 `install.sh`。
 
 ```bash
-dpkg -l mininet openvswitch-switch 2>/dev/null | grep ^ii   # 兩行都在 = 已裝好，跳過
 sudo apt install mininet openvswitch-switch
 sudo systemctl enable --now openvswitch-switch
+dpkg -l mininet openvswitch-switch | grep ^ii        # 兩行都在 = 裝好了
 ```
 
-## 3. Mininet + Open vSwitch（Ubuntu 20.04）
+**公用機器上，最後那行要先跑。** 兩個都已經在的話就跳過安裝 —— `apt install` 會順手
+把已裝的 Open vSwitch 升級並重啟服務，別人正在跑的實驗會被打斷。
 
-從原始碼。`-s` 讓依賴的 clone 一起放進
-`src/`，而不是散在 `$HOME`，而且必須寫在 `-n` `-v` 前面。
+### 原始碼路線 —— Ubuntu 20.04
+
+`-s` 讓依賴的 clone 一起放進 `src/`，而不是散在 `$HOME`，而且必須寫在 `-n` `-v` 前面。
 
 ```bash
 git clone https://github.com/mininet/mininet src/mininet
@@ -58,7 +63,7 @@ SRC="$PWD/src"
 那對括號是刻意的 —— 它讓 `cd` 只在子 shell 裡生效，跑完你還在 repo 根目錄。`src/` 已經在
 `.gitignore` 裡，不會被 commit 進去。
 
-## 4. Python 環境
+## 3. Python 環境
 
 兩條路都一樣。
 
@@ -70,10 +75,10 @@ pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 \
 pip install -r requirements.txt
 ```
 
-## 5. 讓 env 看得到 Mininet
+## 4. 讓 env 看得到 Mininet
 
 apt 是裝給系統 Python 3.12，原始碼安裝是進系統的
-`dist-packages`，兩種 conda 直譯器都看不到。照你走的那條選一行：
+`dist-packages`，兩種 conda 直譯器都看不到。照你第 2 步選的路線挑一行：
 
 ```bash
 # 24.04 (apt)：把那一個套件連進來
@@ -83,7 +88,7 @@ ln -sfn /usr/lib/python3/dist-packages/mininet "$CONDA_PREFIX/lib/python3.8/site
 echo /usr/local/lib/python3.8/dist-packages > "$CONDA_PREFIX/lib/python3.8/site-packages/system_dist_packages.pth"
 ```
 
-## 6. Ryu 與延遲 patch
+## 5. Ryu 與延遲 patch
 
 **要從 git 裝，不能用 `pip install ryu`。** PyPI 上最後一版
 （4.34，2020 年）早於 eventlet 0.30.3 的破壞性變更，裝完 `import ryu` 會死在
@@ -102,7 +107,7 @@ python scripts/patch_ryu.py
 
 延遲 patch 是每條 link 的延遲量得到的前提，**少了它延遲全部讀 0，而且不會有任何錯誤**。
 
-## 7. 產生流量腳本
+## 6. 產生流量腳本
 
 把 pickle 的 traffic matrix 轉成 Mininet 要重放的 iperf3 腳本，寫到
 `dataset/<topo>_traffic/<tm 目錄>/TM-<id>/{Clients,Servers}/`。目錄已存在就跳過。
@@ -112,7 +117,7 @@ python dataset/prepare_dataset.py --topology 32node --tms 144tm
 python dataset/prepare_dataset.py --topology geant  --tms 24tm --tm_scale 3
 ```
 
-## 8. 檢查
+## 7. 檢查
 
 三行都要過才往下走。
 
@@ -125,7 +130,7 @@ sudo mn --test pingall
 第一行要印出 torch 版本跟 `True`，第二行要印出 `PATCHED`。**第二行沒過就不要開始訓練**
 —— 少了 patch，每條 link 的延遲都是 0，而且不會有任何提示。
 
-## 9. 訓練
+## 8. 訓練
 
 **在第 1 步那個 tmux session 裡開一個具名視窗給它**，三個行程就會各佔一個視窗，而你
 原本那個 shell 保持空著可以查東西：
@@ -169,7 +174,7 @@ Ctrl-b [      進捲動模式往上翻（q 離開）
 
 視窗名稱是 `controller` 跟 `drl`。程式結束之後視窗會留著（`remain-on-exit`），所以
 **當掉的訊息看得到**，不會一閃就消失 —— 標題列會顯示 `Pane is dead (status N)`。先
-`Ctrl-b [` 翻 traceback，看完再交給第 10 步的 `clean.sh` 清掉整個 session。
+`Ctrl-b [` 翻 traceback，看完再交給第 9 步的 `clean.sh` 清掉整個 session。
 
 不想用 tmux 的話，`--terminal gnome` 會各開一個 GUI 視窗，`--terminal inline` 則把兩者
 的輸出直接混在目前的終端機。
@@ -200,7 +205,7 @@ sudo -E "$PY" main.py --env 32node_144tm_directed --alg ls2ic_dd train
 `STRIDE_VARIANT` 必須是環境變數，而且要寫成明確的 `VAR=value` 指派 —— 光靠 `sudo -E`
 會把它弄丟，掉了就**安靜地訓練預設架構**。`--seed` 是一般參數，不會掉。
 
-## 10. 每次跑完收尾
+## 9. 每次跑完收尾
 
 ```bash
 ./scripts/clean.sh
@@ -210,7 +215,7 @@ sudo -E "$PY" main.py --env 32node_144tm_directed --alg ls2ic_dd train
 驗證 controller port 有沒有釋放 —— 下一次執行就會接到一個停滯的舊 controller，產出
 一條看起來合理但毫無價值的曲線，而且全程沒有任何錯誤訊息。
 
-## 11. 測試
+## 10. 測試
 
 ```bash
 PY="$HOME/miniconda3/envs/stride/bin/python"
@@ -251,7 +256,7 @@ results/stride/runs/base_32node_s17_<date>_<time>/
 沒有 checkpoint 可載的 baseline（`ospf`、`ilp`、`widest_path`、`drsir`）本來就不用給
 `--model`，上面那個目錄形狀對它們才是正常的。
 
-## 12. 圖與表
+## 11. 圖與表
 
 ```bash
 PY="$HOME/miniconda3/envs/stride/bin/python"
