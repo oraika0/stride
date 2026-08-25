@@ -1,0 +1,118 @@
+# Experiment output. Two different things live here.
+#
+# results/<alg>/runs/<name>/{train,test} is the archive: one directory per run,
+# named for the command that reproduces it, never overwritten. That is tracked --
+# every training log and every test session, so a later reader can plot something
+# nobody has plotted yet and check it against the run that produced it.
+#
+# results/<alg>/ outside runs/ is live scratch the controller and the agent pass
+# files through. Every run overwrites it, so which run any of it belongs to is
+# unknowable: 474 MB and 39k files that are not evidence of anything.
+#
+# Checkpoints are tracked too. They are 562 MB of tensors that barely compress,
+# which is the whole reason to think about it -- but without them the archive
+# cannot be tested against, only read, and a run you cannot re-evaluate is not a
+# reproducible result. The cost is that re-training and re-committing a
+# checkpoint keeps both copies in history forever, so replace them deliberately.
+/results/*
+!/results/*/
+/results/*/*
+!/results/*/runs/
+!/results/*/runs/**
+
+# Dataset: keep what cannot be rebuilt, drop what can.
+#
+# Tracked (~8 MB): bw_r.txt and k_paths.json, which define the topology and the
+# frozen candidate set every result indexes into and which cannot be regenerated
+# (see dataset/README.md), plus the traffic-matrix sources prepare_dataset.py
+# needs, so a clone can build the rest.
+#
+# Ignored: the generated iperf3 script trees (dataset/prepare_dataset.py rebuilds
+# them), the full GEANT archive when only 96 matrices are used, and the notebooks.
+dataset/*/*
+!dataset/*/*.json
+!dataset/*/*.txt
+!dataset/*/*.md
+!dataset/*/traffic_generator/
+dataset/*/traffic_generator/*
+!dataset/*/traffic_generator/*.pkl
+!dataset/*/traffic_generator/*.json
+!dataset/*/traffic_generator/*.py
+!dataset/*/traffic_generator/*.md
+!dataset/*/traffic_generator/traffic-matrices/
+
+# Vendored Enero traffic data. The gym environment reads .demands files from
+# here, so a clone cannot train without them -- but the GEANT directories hold
+# 2644 matrices where 24 are indexed. Track the topology, the candidate paths and
+# the matrices the configs actually name; ignore the rest (~85 MB), which
+# dataset/convert_*_to_enero.py rebuilds.
+A-Traffic-Engineering-Method-Using-RouteNet-Based-Actor-Critic-Learning-in-SDN-Routing-main/Enero_datasets/**
+!A-Traffic-Engineering-Method-Using-RouteNet-Based-Actor-Critic-Learning-in-SDN-Routing-main/Enero_datasets/**/
+!**/NEW_32node_144tm/**
+!**/NEW_32node_24tm/**
+!**/NEW_Geant_s3/EVALUATE/Geant.graph
+!**/NEW_Geant_s3/EVALUATE/k_shortest_paths.json
+
+# Live scratch written by the Ryu controller and the delay tracer.
+artifacts/
+
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+# TRAIN and ALL are symlinks to EVALUATE (git stores them as links, a few bytes
+# each). paper/tables/build_paper_table.py resolves TRAIN/TM, so without these
+# a clone has the .demands files but no path that reaches them.
+!**/NEW_Geant/ALL
+!**/NEW_Geant/TRAIN
+!**/NEW_Geant_s3/ALL
+!**/NEW_Geant_s3/TRAIN
+!**/NEW_32node_144tm/ALL
+!**/NEW_32node_144tm/TRAIN
+!**/NEW_32node_24tm/ALL
+!**/NEW_32node_24tm/TRAIN
+
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.0.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.1.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.2.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.3.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.4.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.5.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.6.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.7.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.8.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.9.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.10.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.11.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.12.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.13.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.14.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.15.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.16.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.17.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.18.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.19.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.20.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.21.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.22.demands
+!**/NEW_Geant_s3/EVALUATE/TM/Geant.23.demands
+
+# The thesis itself is not published here -- see paper/THESIS.md. Both formats
+# are ignored so that dropping a copy back into paper/ cannot be committed by
+# accident; delete these two lines to publish it.
+paper/*.docx
+paper/*.pdf
+
+# Third-party source cloned during setup -- Mininet and Ryu, plus whatever
+# install.sh pulls in beside them. Needed once to build and install; the
+# installed copies are what run. See QUICKSTART step 1.
+/src/
+
+# Rebuilt from the training logs every time a reward figure is generated, in
+# about a third of a second. Tracking them meant every regeneration carried a
+# 36000-row diff that said nothing. NOT the same as
+# paper/figures/timing/train_steps/timing_steps.csv, which is tracked on purpose:
+# that one holds runs whose timings exist nowhere else.
+/paper/figures/reward/train_curves.csv
+/paper/figures/reward/components.csv
+

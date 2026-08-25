@@ -1,0 +1,35 @@
+# STRIDE — Python dependencies (Python 3.8)
+#
+# PyTorch is NOT listed here: install it first with the CUDA-matched index so pip
+# does not pull the CPU wheel.
+#
+#   pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 \
+#       --index-url https://download.pytorch.org/whl/cu118
+#
+# Mininet is NOT installable via pip. It is installed system-wide (from source on
+# 20.04, from apt on 24.04) and reached from the conda env by a .pth file or a
+# symlink. See README §2.1 and §2.2. `pexpect` below is Mininet's own dependency,
+# which the system install satisfies for the system interpreter but not for ours.
+
+# --- numerics / data ---
+numpy==1.24.4
+pandas==2.0.3
+scipy==1.10.1
+
+# --- graphs, plotting ---
+networkx==3.1
+matplotlib==3.7.2
+seaborn==0.12.2
+Pillow==10.4.0
+
+# --- simulation environment (vendored Enero/RouteNet gym env) ---
+gym==0.17.3
+
+# --- SDN controller ---
+# ryu is NOT installable from here. The last PyPI release (4.34, 2020) predates
+# eventlet 0.30.3 and dies on `from eventlet.wsgi import ALREADY_HANDLED`;
+# upstream master fixed it and never released again. Install from git and apply
+# the delay patch -- QUICKSTART step 1, or README section 2.3.
+# eventlet is pinned: >=0.31 changes the green-thread API in ways ryu 4.34
+# does not tolerate.
+eventlet==0.31.1
