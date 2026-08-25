@@ -116,3 +116,5 @@ paper/*.pdf
 /paper/figures/reward/train_curves.csv
 /paper/figures/reward/components.csv
 
+# Local tooling for the manuscript file, which is not published here either.
+/paper/fix_pdf_textlayer.py

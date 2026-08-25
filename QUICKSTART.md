@@ -18,21 +18,13 @@ tables rebuild without having to reproduce the experiments first.
 ## 1. Get the repository
 
 **Run the whole thing inside tmux.** An SSH drop then does not kill the install,
-scrollback survives, and when output needs to go to someone else -- or to an AI --
-it can be dumped to a file rather than copied out of a terminal by hand:
+and the scrollback survives it:
 
 ```bash
 tmux new -s setup
 ```
 
-`Ctrl-b d` detaches, `tmux attach -t setup` comes back. To save a pane's output:
-
-```bash
-tmux capture-pane -p -t setup -S -5000 > /tmp/setup.log
-```
-
-`-S -5000` reaches five thousand lines back. **This is the command to reach for
-whenever a step below goes wrong.**
+`Ctrl-b d` detaches, `tmux attach -t setup` comes back.
 
 
 ```bash
@@ -197,12 +189,6 @@ The windows are named `controller` and `drl`. A window stays after its process
 exits (`remain-on-exit`), so **a crash stays on screen** instead of vanishing with
 the terminal -- the status line reads `Pane is dead (status N)`. Scroll the
 traceback with `Ctrl-b [`, then let step 10's `clean.sh` take the session away.
-
-To save a window's output to a file, for someone else or for an AI to read:
-
-```bash
-sudo tmux capture-pane -p -t stride:drl -S -5000 > /tmp/drl.log
-```
 
 Without tmux, `--terminal gnome` opens a GUI window each and `--terminal inline`
 interleaves both into the current terminal.

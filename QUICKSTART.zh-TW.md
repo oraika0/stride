@@ -21,14 +21,7 @@ session、checkpoint 都在 —— 所以圖表不必先把實驗重跑一遍就
 tmux new -s setup
 ```
 
-之後任何時候 `Ctrl-b d` 離開、`tmux attach -t setup` 回來。要把某個 pane 的完整輸出
-存下來：
-
-```bash
-tmux capture-pane -p -t setup -S -5000 > /tmp/setup.log
-```
-
-`-S -5000` 是往回抓五千行。**這條指令在下面每一步出錯時都用得上。**
+之後任何時候 `Ctrl-b d` 離開、`tmux attach -t setup` 回來。
 
 
 ```bash
@@ -177,12 +170,6 @@ Ctrl-b [      進捲動模式往上翻（q 離開）
 視窗名稱是 `controller` 跟 `drl`。程式結束之後視窗會留著（`remain-on-exit`），所以
 **當掉的訊息看得到**，不會一閃就消失 —— 標題列會顯示 `Pane is dead (status N)`。先
 `Ctrl-b [` 翻 traceback，看完再交給第 10 步的 `clean.sh` 清掉整個 session。
-
-要把某個視窗的完整輸出存成檔案（貼給別人或給 AI 看）：
-
-```bash
-sudo tmux capture-pane -p -t stride:drl -S -5000 > /tmp/drl.log
-```
 
 不想用 tmux 的話，`--terminal gnome` 會各開一個 GUI 視窗，`--terminal inline` 則把兩者
 的輸出直接混在目前的終端機。
