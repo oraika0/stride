@@ -139,8 +139,7 @@ python scripts/patch_ryu.py --check
 sudo mn --test pingall
 ```
 
-第一行要印出 torch 版本跟 `True`，第二行要印出 `PATCHED`。**第二行沒過就不要開始訓練**
-—— 少了 patch，每條 link 的延遲都是 0，而且不會有任何提示。
+第一行要印出 torch 版本跟 `True`，第二行要印出 `PATCHED`。
 
 ## 8. 訓練
 
@@ -154,12 +153,6 @@ tmux new-window -n main "sudo -E $PY main.py --env 32node_144tm_directed --alg s
 
 視窗會叫 `main`，controller 與 drl 隨後加在它旁邊。結尾的 `exec bash` 讓視窗在訓練結束
 或當掉之後留著，錯誤訊息才看得到。
-
-不介意佔用目前這個 shell 的話，直接跑也可以，只是視窗名字會是 `bash`：
-
-```bash
-sudo -E "$PY" main.py --env 32node_144tm_directed --alg stride train
-```
 
 `sudo -E` 會把 `$TMUX` 一起帶過去，launcher 看到它就把 controller 與 drl 開成**目前這個
 session 的新視窗**，而不是另外建一個 root 的。所以三個都用一般的 `tmux attach` 就看得到，

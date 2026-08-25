@@ -151,9 +151,7 @@ python scripts/patch_ryu.py --check
 sudo mn --test pingall
 ```
 
-The first must print a torch version and `True`, the second `PATCHED`. **Do not
-start training if the second fails** — without the patch every link delay reads 0
-and nothing tells you.
+The first must print a torch version and `True`, the second `PATCHED`.
 
 ## 8. Train
 
@@ -168,13 +166,6 @@ tmux new-window -n main "sudo -E $PY main.py --env 32node_144tm_directed --alg s
 The window is called `main`, and the controller and the agent appear beside it.
 The trailing `exec bash` keeps it open when training ends or dies, so the error
 stays readable.
-
-If tying up the current shell does not matter, run it directly -- the window is
-just named `bash` then:
-
-```bash
-sudo -E "$PY" main.py --env 32node_144tm_directed --alg stride train
-```
 
 `sudo -E` carries `$TMUX` through, and the launcher, seeing it, opens the
 controller and the agent as windows of **this** session instead of making a root
