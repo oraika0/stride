@@ -663,3 +663,101 @@ dataset/extend_k_paths.py        build a K=30 candidate file while preserving th
   after which the agent process errors out. Shut everything down (§4) and retry.
 - **`sudo -E` does not reliably forward variables.** Always use the
   `sudo -E "VAR=value" python ...` form.
+
+---
+
+## 11. Complete removal
+
+The order runs from **what is only yours** to **what the machine shares**. The
+first three steps are safe on a shared machine. The fourth is not.
+
+Against the table in §2.1: Ryu and its patch live inside the conda environment,
+so removing the environment takes them with it. Mininet and Open vSwitch are
+system-level, and everyone else on the machine uses the same copy.
+
+### 11.1 Confirm the experiment data exists somewhere else
+
+`results/*/runs/` holds the complete archive of every run — training logs, test
+sessions, checkpoints. It is tracked in git, but **only what has been pushed
+exists anywhere else**.
+
+```bash
+cd ~/stride && git status --short && git log --oneline origin/main..HEAD
+```
+
+Continue only if both print nothing. Any output means something still exists
+only on this machine.
+
+### 11.2 Stop what is still running
+
+```bash
+sudo mn -c                                  # clear leftover namespaces and bridges
+sudo killall -q iperf3 ryu-manager
+tmux ls; sudo tmux ls                       # check both — the controller may be in root's session
+```
+
+`sudo tmux ls` is a separate check because, when the run was not started inside
+tmux, the controller and the agent are put in a detached session owned by root
+whose socket is separate from yours. Once you know which sessions to remove, use
+`tmux kill-session -t <name>` rather than `kill-server`, which would take your
+other sessions with it.
+
+### 11.3 The repository and the conda environment
+
+```bash
+rm -rf ~/stride                             # including the Mininet source tree under src/
+conda env remove -n stride
+```
+
+Ryu, the delay-measurement patch and the Mininet symlink created by the apt route
+in §2.1 all live inside the environment and disappear with it. Other conda
+environments on the machine are untouched.
+
+### 11.4 Mininet and Open vSwitch — shared, affects other people
+
+> **Check that nobody else is using them first.** These are system packages and
+> belong to no single user. If you simply do not want to run experiments any
+> more, stopping after 11.3 is enough.
+
+apt route (Ubuntu 24.04 and later)
+
+```bash
+sudo systemctl disable --now openvswitch-switch
+sudo apt purge mininet openvswitch-switch openvswitch-common \
+               openvswitch-pki openvswitch-testcontroller
+sudo apt autoremove
+```
+
+Source route (Ubuntu 20.04). `install.sh` has **no** uninstall target, so this is
+manual.
+
+```bash
+sudo rm -rf /usr/local/lib/python3.8/dist-packages/mininet \
+            /usr/local/lib/python3.8/dist-packages/mininet-*.dist-info
+sudo rm -f  /usr/local/bin/mn /usr/bin/mnexec
+```
+
+The source route installs Open vSwitch **through apt as well** (`install.sh -a`
+calls apt internally), so purge it exactly as above.
+
+### 11.5 Open vSwitch leftover state
+
+purge does not remove the database. It holds the bridge definitions, so delete it
+only if Open vSwitch is not wanted at all.
+
+```bash
+sudo rm -rf /etc/openvswitch /var/lib/openvswitch /var/log/openvswitch
+```
+
+### 11.6 Verify
+
+```bash
+command -v mn mnexec ovs-vsctl     # all three should print nothing
+conda env list | grep stride       # should print nothing
+ls ~/stride                        # No such file or directory
+ip -br link | grep -E "^(s[0-9]|ovs)"   # no leftover interfaces
+```
+
+All four clear means the machine is clean. Interfaces like `s1` or `s2` still in
+`ip -br link` mean `sudo mn -c` in 11.2 did not run or did not succeed — run it
+again.

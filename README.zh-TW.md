@@ -577,3 +577,90 @@ dataset/extend_k_paths.py        建立 K=30 候選檔，同時保留凍結的 K
 - **機器太慢**可能讓 controller 錯過 30 秒的啟動視窗，之後 agent process 會出錯。照
   §4 的方式清乾淨再重跑。
 - **`sudo -E` 不保證傳遞環境變數**。一律用 `sudo -E "VAR=value" "$PY" ...` 的形式。
+
+---
+
+## 11. 完全移除
+
+順序是從**只屬於你的**東西排到**大家共用的**。前三步在共用機器上都安全，第四步不是。
+
+對照 §2.1 那張表：Ryu 與它的 patch 在 conda env 裡面，砍 env 就跟著走。Mininet 與
+Open vSwitch 是系統層級的，這台機器上的其他人也在用同一份。
+
+### 11.1 先確認實驗資料還在別的地方
+
+`results/*/runs/` 底下是每一次 run 的完整歸檔——訓練 log、測試 session、checkpoint。
+它有進 git，但**只有推上去的部分才在別的地方**。
+
+```bash
+cd ~/stride && git status --short && git log --oneline origin/main..HEAD
+```
+
+兩個都沒有輸出才往下走。有輸出就是還有東西只存在這台機器上。
+
+### 11.2 停掉還在跑的東西
+
+```bash
+sudo mn -c                                  # 清掉殘留的 namespace 與 bridge
+sudo killall -q iperf3 ryu-manager
+tmux ls; sudo tmux ls                       # 兩邊都要看，controller 可能在 root 的 session
+```
+
+`sudo tmux ls` 要另外看，是因為不在 tmux 裡啟動時，controller 與 agent 會被丟進一個屬於
+root 的 detached session，socket 跟你的分開。確認要砍哪些之後再用
+`tmux kill-session -t <名稱>`，不要用 `kill-server`，那會連你其他的 session 一起帶走。
+
+### 11.3 repo 與 conda 環境
+
+```bash
+rm -rf ~/stride                             # 含 src/ 底下的 Mininet 原始碼樹
+conda env remove -n stride
+```
+
+Ryu、延遲量測 patch、以及 §2.1 apt 路線建立的那個 Mininet symlink 都在 env 裡面，
+一起消失。這台機器上其他的 conda env 不受影響。
+
+### 11.4 Mininet 與 Open vSwitch —— 共用，會影響其他人
+
+> **這一步之前先確認沒有別人在用。** 這兩個是系統套件，不屬於任何單一使用者。
+> 只是不想再跑實驗的話，做到 11.3 就夠了。
+
+apt 路線（Ubuntu 24.04 以上）
+
+```bash
+sudo systemctl disable --now openvswitch-switch
+sudo apt purge mininet openvswitch-switch openvswitch-common \
+               openvswitch-pki openvswitch-testcontroller
+sudo apt autoremove
+```
+
+原始碼路線（Ubuntu 20.04）。`install.sh` **沒有** uninstall，要自己刪。
+
+```bash
+sudo rm -rf /usr/local/lib/python3.8/dist-packages/mininet \
+            /usr/local/lib/python3.8/dist-packages/mininet-*.dist-info
+sudo rm -f  /usr/local/bin/mn /usr/bin/mnexec
+```
+
+原始碼路線的 Open vSwitch **也是 apt 裝的**（`install.sh -a` 內部就是呼叫 apt），
+所以 OVS 的部分跟上面那段一樣，用 purge。
+
+### 11.5 Open vSwitch 的殘留狀態
+
+purge 不會刪掉資料庫。裡面是 bridge 定義，確定不再用 OVS 才刪。
+
+```bash
+sudo rm -rf /etc/openvswitch /var/lib/openvswitch /var/log/openvswitch
+```
+
+### 11.6 驗證
+
+```bash
+command -v mn mnexec ovs-vsctl     # 三個都不該有輸出
+conda env list | grep stride       # 不該有輸出
+ls ~/stride                        # No such file or directory
+ip -br link | grep -E "^(s[0-9]|ovs)"   # 不該有殘留介面
+```
+
+四項都符合就乾淨了。`ip -br link` 還有 `s1`、`s2` 之類的介面，代表 11.2 的
+`sudo mn -c` 沒跑或跑失敗，補跑一次。
