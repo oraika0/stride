@@ -63,7 +63,7 @@ loose in `$HOME`, and has to come before `-n` and `-v`.
 ```bash
 git clone https://github.com/mininet/mininet src/mininet
 SRC="$PWD/src"
-(cd src/mininet/util && ./install.sh -s "$SRC" -nv)    # 20-40 min
+(cd src/mininet/util && ./install.sh -s "$SRC" -nv)
 ```
 
 The parentheses are deliberate: they keep the `cd` inside a subshell, so you are

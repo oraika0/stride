@@ -57,7 +57,7 @@ dpkg -l mininet openvswitch-switch | grep ^ii        # 兩行都在 = 裝好了
 ```bash
 git clone https://github.com/mininet/mininet src/mininet
 SRC="$PWD/src"
-(cd src/mininet/util && ./install.sh -s "$SRC" -nv)    # 20-40 分鐘
+(cd src/mininet/util && ./install.sh -s "$SRC" -nv)
 ```
 
 那對括號是刻意的 —— 它讓 `cd` 只在子 shell 裡生效，跑完你還在 repo 根目錄。`src/` 已經在
