@@ -350,6 +350,58 @@ A run directory name is the command that reproduces it: `base_32node_s17_...` is
 
 ---
 
+## Complete removal
+
+Ordered from what is yours alone to what the machine shares. The first two
+blocks are safe on a shared machine. The third is not.
+
+**Confirm the experiment data exists somewhere else first.** `results/*/runs/`
+is the complete archive of every run. It is tracked in git, but only what has
+been pushed exists anywhere else.
+
+```bash
+cd ~/stride && git status --short && git log --oneline origin/main..HEAD
+```
+
+Continue only if both print nothing. Then stop what is still running.
+
+```bash
+sudo mn -c
+sudo killall -q iperf3 ryu-manager
+tmux ls; sudo tmux ls        # check both — the controller may be in root's session
+```
+
+Once you know which sessions to remove use `tmux kill-session -t <name>`, not
+`kill-server`, which would take your other sessions with it. Then the repository
+and the conda environment.
+
+```bash
+rm -rf ~/stride              # including the Mininet source tree under src/
+conda env remove -n stride
+```
+
+Ryu, the delay patch and the symlink from step 4 all live inside the environment
+and go with it. Other conda environments are untouched.
+
+**Stop here** if you simply do not want to run experiments any more.
+
+**Mininet and Open vSwitch are system packages, and everyone else on the machine
+uses the same copy.** To remove those as well, check that nobody else is using
+them first — commands and leftover state are in `README.md` §11.
+
+Verify.
+
+```bash
+command -v mn mnexec ovs-vsctl     # all three should print nothing
+conda env list | grep stride       # should print nothing
+ip -br link | grep -E "^(s[0-9]|ovs)"   # no leftover interfaces
+```
+
+Interfaces like `s1` or `s2` still there mean `sudo mn -c` did not run or did
+not succeed. Run it again.
+
+---
+
 ## Every run the paper reports
 
 One command per row. Each is the whole chain — clean, train, clean, test, clean

@@ -316,6 +316,52 @@ run 的目錄名就是重現它的指令：`base_32node_s17_...` 等於 `STRIDE_
 
 ---
 
+## 完全移除
+
+從只屬於你的排到大家共用的。前兩塊在共用機器上安全，第三塊不是。
+
+**先確認實驗資料還在別的地方。** `results/*/runs/` 是每次 run 的完整歸檔，有進 git，
+但只有推上去的部分才在別的地方。
+
+```bash
+cd ~/stride && git status --short && git log --oneline origin/main..HEAD
+```
+
+兩個都沒有輸出才往下。接著停掉還在跑的東西。
+
+```bash
+sudo mn -c
+sudo killall -q iperf3 ryu-manager
+tmux ls; sudo tmux ls        # 兩邊都看，controller 可能在 root 的 session
+```
+
+確認要砍哪些之後用 `tmux kill-session -t <名稱>`，不要 `kill-server`，那會連你其他的
+session 一起帶走。然後砍 repo 與 conda 環境。
+
+```bash
+rm -rf ~/stride              # 含 src/ 底下的 Mininet 原始碼樹
+conda env remove -n stride
+```
+
+Ryu、延遲 patch、§4 建立的 symlink 都在 env 裡面，一起消失。其他 conda env 不受影響。
+
+**到這裡為止就夠了**，如果你只是不想再跑實驗。
+
+**Mininet 與 Open vSwitch 是系統套件，這台機器上的其他人也在用同一份。** 要連它們一起
+移除，先確認沒有別人在用，指令與各種殘留在 `README.zh-TW.md` §11。
+
+驗證。
+
+```bash
+command -v mn mnexec ovs-vsctl     # 三個都不該有輸出
+conda env list | grep stride       # 不該有輸出
+ip -br link | grep -E "^(s[0-9]|ovs)"   # 不該有殘留介面
+```
+
+還有 `s1`、`s2` 之類的介面，代表 `sudo mn -c` 沒跑或跑失敗，補跑一次。
+
+---
+
 ## 論文用到的每一次 run
 
 一列一行指令。每一行都是完整的 chain —— clean、訓練、clean、測試、clean —— 所以一列
