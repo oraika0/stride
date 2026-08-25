@@ -96,14 +96,26 @@ echo /usr/local/lib/python3.8/dist-packages > "$CONDA_PREFIX/lib/python3.8/site-
 
 ```bash
 git clone https://github.com/faucetsdn/ryu src/ryu
-pip install "setuptools==58.0.0" wheel
+pip install "setuptools==58.0.0" wheel "pbr==5.11.1"
 pip install ./src/ryu --no-build-isolation
 python scripts/patch_ryu.py
 ```
 
-`setuptools==58.0.0` 這個 pin 也不能省 —— ryu 的 `setup.py` 會呼叫
-`easy_install.get_script_args`，那個 API 在 setuptools 58 之後被移除。`--no-build-isolation`
-是為了讓建置用 env 裡這個舊版，而不是 pip 另外抓的最新版。
+兩個 pin 都不能省，理由不一樣。
+
+**setuptools 58**：ryu 的 `setup.py` 會呼叫 `easy_install.get_script_args`，那個 API 在
+setuptools 58 之後被移除。`--no-build-isolation` 是為了讓建置用 env 裡這個舊版，而不是
+pip 另外抓的最新版。
+
+**pbr 5.11.1**：光釘 setuptools 不夠。ryu 的 `setup.py` 寫了 `setup_requires=['pbr']`
+而且沒指定版本，而 `setup_requires` 是 **setuptools 自己的機制、不是 pip 的** —— 它會在
+建置當下把最新的 pbr 抓進 `src/ryu/.eggs/`，`--no-build-isolation` 管不到那裡。新版 pbr 會
+`from setuptools.extern.tomli import load`，而 setuptools 要到 61 才開始 vendor `tomli`，
+於是建置死在 `ModuleNotFoundError: No module named 'setuptools.extern.tomli'`。事先把 pbr
+裝好，需求就已經滿足，不會再去抓。
+
+如果你在加這個 pin 之前已經撞到那個錯，重試前要先砍掉 `src/ryu/.eggs` —— 不然它會直接用
+已經抓下來的那份。
 
 延遲 patch 是每條 link 的延遲量得到的前提，**少了它延遲全部讀 0，而且不會有任何錯誤**。
 

@@ -135,17 +135,22 @@ Controller 靠 LLDP 封包的往返時間量測每條 link 的延遲，而上游
 
 ```bash
 git clone https://github.com/faucetsdn/ryu src/ryu
-pip install "setuptools==58.0.0" wheel
+pip install "setuptools==58.0.0" wheel "pbr==5.11.1"
 pip install ./src/ryu --no-build-isolation
 python scripts/patch_ryu.py
 ```
 
 **不是 `pip install ryu`。** PyPI 上最後一版是 2020 年的 4.34，早於 eventlet 0.30.3
 移除 `ALREADY_HANDLED`，裝下去會得到一個「裝得起來但 import 就死」的套件。上游 master
-有相容性修正，但之後再也沒發布過，所以 git tree 是唯一能用的來源。`setuptools==58.0.0`
-是另一個獨立而且同樣必要的 pin —— ryu 的 `setup.py` 呼叫 `easy_install.get_script_args`，
-那個 API 在 setuptools 58 之後被移除；`--no-build-isolation` 則是讓建置看得到這個 pin，
-而不是用 pip 另外抓的最新版。
+有相容性修正，但之後再也沒發布過，所以 git tree 是唯一能用的來源。
+
+兩個 pin 是各自獨立、而且都必要。`setuptools==58.0.0`：ryu 的 `setup.py` 呼叫
+`easy_install.get_script_args`，那個 API 在 setuptools 58 之後被移除；`--no-build-isolation`
+則是讓建置看得到這個 pin，而不是用 pip 另外抓的最新版。`pbr==5.11.1`：ryu 寫了
+`setup_requires=['pbr']` 且沒指定版本，而 `setup_requires` 是 setuptools 自己的機制、
+不是 pip 的 —— 它會在建置當下把最新的 pbr 抓進 `src/ryu/.eggs/`，`--no-build-isolation`
+管不到；新版 pbr 會 import `setuptools.extern.tomli`，而 setuptools 要到 61 才開始
+vendor 它。事先裝好 pbr 就滿足了需求，不會再去抓。
 
 腳本會在已安裝的套件裡做三處插入 —— `PortData` 加一個 `delay` 欄位、handler 開頭取
 接收時間戳、以及填進那個欄位的相減 —— 然後**重新 import 該模組確認改動生效**。它是

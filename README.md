@@ -148,7 +148,7 @@ upstream Ryu records nowhere: `PortData` timestamps when a frame was *sent*, and
 
 ```bash
 git clone https://github.com/faucetsdn/ryu src/ryu
-pip install "setuptools==58.0.0" wheel
+pip install "setuptools==58.0.0" wheel "pbr==5.11.1"
 pip install ./src/ryu --no-build-isolation
 python scripts/patch_ryu.py
 ```
@@ -156,11 +156,17 @@ python scripts/patch_ryu.py
 **Not `pip install ryu`.** The last PyPI release is 4.34 from 2020, which predates
 eventlet 0.30.3 removing `ALREADY_HANDLED`; installing it gives you a package that
 imports and then dies. Upstream master carries the compatibility fix and has never
-been released, so the git tree is the only working source. The `setuptools==58.0.0`
-pin is separate and equally required: ryu's `setup.py` calls
-`easy_install.get_script_args`, gone since setuptools 58, and
+been released, so the git tree is the only working source.
+
+The two pins are separate and both required. `setuptools==58.0.0`: ryu's
+`setup.py` calls `easy_install.get_script_args`, gone since setuptools 58, and
 `--no-build-isolation` is what makes the build see the pin instead of a fresh
-latest setuptools pip fetches for itself.
+latest setuptools pip fetches for itself. `pbr==5.11.1`: ryu declares
+`setup_requires=['pbr']` unversioned, and `setup_requires` is setuptools' own
+mechanism rather than pip's -- it downloads the newest pbr into `src/ryu/.eggs/`
+mid-build, out of `--no-build-isolation`'s reach, and current pbr imports
+`setuptools.extern.tomli`, which setuptools only began vendoring at 61. Having
+pbr installed already satisfies the requirement and nothing is fetched.
 
 The script makes three edits inside the installed package — a `delay` field on
 `PortData`, a receive timestamp at the top of the handler, and the subtraction

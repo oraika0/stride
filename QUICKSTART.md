@@ -104,15 +104,28 @@ ryu` dies on `ALREADY_HANDLED`. Upstream master fixed it and never released agai
 
 ```bash
 git clone https://github.com/faucetsdn/ryu src/ryu
-pip install "setuptools==58.0.0" wheel
+pip install "setuptools==58.0.0" wheel "pbr==5.11.1"
 pip install ./src/ryu --no-build-isolation
 python scripts/patch_ryu.py
 ```
 
-The setuptools pin is not optional either: ryu's `setup.py` calls
-`easy_install.get_script_args`, removed in setuptools 58. `--no-build-isolation`
-is what makes the build use that pinned copy instead of a fresh latest one pip
-fetches for itself.
+Both pins are load-bearing, for different reasons.
+
+**setuptools 58**: ryu's `setup.py` calls `easy_install.get_script_args`, which
+setuptools removed in 58. `--no-build-isolation` is what makes the build use that
+installed copy rather than a fresh latest one pip fetches for itself.
+
+**pbr 5.11.1**: that is not enough on its own. ryu's `setup.py` declares
+`setup_requires=['pbr']` with no version, and `setup_requires` is setuptools'
+own mechanism, not pip's -- it downloads the newest pbr into `src/ryu/.eggs/`
+during the build, where `--no-build-isolation` has no say. Current pbr then does
+`from setuptools.extern.tomli import load`, and setuptools only started vendoring
+tomli at 61, so the build dies on `ModuleNotFoundError: No module named
+'setuptools.extern.tomli'`. Installing pbr first satisfies the requirement and
+nothing is fetched.
+
+If you hit that error before adding the pin, delete `src/ryu/.eggs` before
+retrying -- the downloaded copy is used again otherwise.
 
 The delay patch is what makes per-link latency measurable; **without it every link
 delay reads 0 and nothing raises.**
