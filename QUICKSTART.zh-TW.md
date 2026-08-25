@@ -143,6 +143,28 @@ sudo mn --test pingall
 
 ## 8. 訓練
 
+**第 8 到 10 步一次跑完**，平常大多數時候都是這樣跑：`clean.sh` → 訓練 → `clean.sh` →
+用剛訓練出來的 checkpoint 測試 → `clean.sh`。
+
+```bash
+./scripts/run_chain.sh                                  # 32node + stride
+./scripts/run_chain.sh geant_directed stride            # 換 env
+./scripts/run_chain.sh 32node_144tm_directed stride 18  # 換 seed
+STRIDE_CHUNK=4 ./scripts/run_chain.sh                   # 帶覆寫
+```
+
+**它自己找得到 checkpoint。** run 目錄名字含時間戳，事前無從得知，所以腳本記下訓練前
+`runs/` 有哪些、訓練後比差集 —— 用「最新的那個」會在別的東西碰過舊目錄時安靜地測錯，
+而測錯的結果看起來跟測對的一模一樣。新增不是剛好一個就中止，不猜。
+
+開頭問一次 sudo 密碼，之後背景每分鐘 refresh，八小時的訓練不會在你離開之後停在密碼提示。
+`STRIDE_*` 那些變數會用明確的 `VAR=value` 形式傳給 sudo，因為 `sudo -E` 對它們不可靠。
+
+這一步剩下的部分跟第 9、10 步，是同三件事分開來跑 —— 給「只想訓練不測試」或「測手上已經有的
+checkpoint」用的。下面關於 tmux、輸出與變體的說明兩邊都適用。
+
+### 只跑訓練
+
 **在第 1 步那個 tmux session 裡開一個具名視窗給它**，三個行程就會各佔一個視窗，而你
 原本那個 shell 保持空著可以查東西：
 
@@ -245,21 +267,9 @@ results/stride/runs/base_32node_s17_<date>_<time>/test/<date>_<time>/
 要讀 `real_directed_test/<tm_id>_eval_metrics.csv`。undirected 那組會把一條 link 雙向的
 容量加總，藏住單方向的飽和。
 
-### 不給 `--model` 會怎樣
-
-會去讀 `results/stride/model` —— 那是每次訓練都會覆寫的即時目錄，等於在測「最後一次
-訓練剛好留下的東西」。而且因為沒有 run 可以歸屬，**session 會另外開一個新的 run 目錄**：
-
-```
-results/stride/runs/base_32node_s17_<date>_<time>/
-└── test/<date>_<time>/          ← 只有 test/，沒有 train/
-```
-
-`runs/` 底下出現只有 `test/` 而沒有 `train/` 的目錄，就是這麼來的 —— 那次測試用的是
-哪個 checkpoint，只有 `ckpt.txt` 裡的 sha256 說得準。
-
 沒有 checkpoint 可載的 baseline（`ospf`、`ilp`、`widest_path`、`drsir`）本來就不用給
-`--model`，上面那個目錄形狀對它們才是正常的。
+`--model`。它們的 run 目錄只有 `test/` 沒有 `train/`，那正是「沒有訓練階段的 run」該有的
+樣子。
 
 ## 11. 圖與表
 
@@ -281,26 +291,6 @@ cd paper/figures/holdout && "$PY" make_holdout_fig.py
 reward 曲線是唯一讀訓練 log 而不是測試 session 的一組，它們走
 `paper/figures/reward/make_curves_csv.py`，裡面的 `RUN_MAP` 記著每條曲線來自哪次 run。
 
-## 一次跑完 clean → train → test
-
-```bash
-./scripts/run_chain.sh                                  # 32node + stride
-./scripts/run_chain.sh geant_directed stride            # 換 env
-./scripts/run_chain.sh 32node_144tm_directed stride 18  # 換 seed
-STRIDE_CHUNK=4 ./scripts/run_chain.sh                   # 帶覆寫
-```
-
-`clean.sh` → 訓練 → `clean.sh` → 用剛訓練出來的 checkpoint 測試 → `clean.sh`。
-
-**它自己找得到 checkpoint。** run 目錄名字含時間戳，事前無從得知，所以腳本記下訓練前
-`runs/` 有哪些、訓練後比差集 —— 用「最新的那個」會在別的東西碰過舊目錄時安靜地測錯，
-而測錯的結果看起來跟測對的一模一樣。新增不是剛好一個就中止，不猜。
-
-開頭問一次 sudo 密碼，之後背景每分鐘 refresh，八小時的訓練不會在你離開之後停在密碼提示。
-`STRIDE_*` 那些變數會用明確的 `VAR=value` 形式傳給 sudo，因為 `sudo -E` 對它們不可靠。
-
-一樣在 tmux 裡跑，controller 與 drl 會開成旁邊的視窗。
-
 ## 如果 update 塞不進 10 秒
 
 監控週期是 10 秒，模型的推論加更新都要在裡面做完。訓練時看 drl 視窗的
@@ -317,7 +307,7 @@ update 把幾個 window 疊成一批送進 GPU。**改它不會改變訓練結�
 dataset/     拓樸、traffic matrix、凍結的候選路徑 —— 輸入，不會被寫入
 results/     所有 run 的產出。runs/<name>/{train,test} 是歸檔，
              results/<alg>/ 底下其餘是 controller 與 agent 交換檔案的即時區
-paper/       圖表產生器（論文本身不隨 repo 發布 —— 見 paper/README.md）
+paper/       圖表產生器 —— 見 paper/README.md
 docs/        方法論筆記，含走過的死路與失敗原因
 ```
 

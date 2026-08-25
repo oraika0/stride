@@ -7,12 +7,6 @@ document without renaming.
 Everything here runs offline from `results/` and `dataset/`. Nothing needs the
 network or a Weights & Biases account.
 
-The manuscript itself is not published with this repository. To keep a copy
-beside its generators, drop the `.docx` and the `.pdf` into this folder: both
-extensions are in [`../.gitignore`](../.gitignore), so a copy placed here stays
-local and cannot be committed by accident. To publish it, delete the two
-`paper/*.{docx,pdf}` lines from that file and commit.
-
 ## Figures
 
 | # | Generator | Reads | Note |

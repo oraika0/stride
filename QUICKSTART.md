@@ -155,6 +155,35 @@ The first must print a torch version and `True`, the second `PATCHED`.
 
 ## 8. Train
 
+**Steps 8 to 10 in one command**, which is how you will run this most of the
+time: `clean.sh`, train, `clean.sh`, test the checkpoint training just produced,
+`clean.sh`.
+
+```bash
+./scripts/run_chain.sh                                  # 32node + stride
+./scripts/run_chain.sh geant_directed stride            # another env
+./scripts/run_chain.sh 32node_144tm_directed stride 18  # another seed
+STRIDE_CHUNK=4 ./scripts/run_chain.sh                   # with an override
+```
+
+**It finds the checkpoint itself.** A run directory's name carries a timestamp
+nobody knows in advance, so the script lists `runs/` before training and takes the
+difference afterwards. Taking "the newest" would quietly test the wrong
+checkpoint whenever something else had touched an older directory, and a test
+against the wrong checkpoint looks exactly like a test against the right one. If
+the difference is not exactly one directory it stops rather than guessing.
+
+sudo is asked for once at the start and refreshed in the background, so an
+eight-hour run does not halt at a password prompt hours after you left. The
+`STRIDE_*` variables are passed as explicit `VAR=value` assignments, since
+`sudo -E` does not carry them reliably.
+
+The rest of this step and steps 9 and 10 are the same three things separately,
+for when you want to train without testing, or test a checkpoint you already
+have. Everything below about tmux, output and variations applies either way.
+
+### Training on its own
+
 **Give it a named window in the session from step 1.** The three processes then
 take a window each and the shell you started from stays free to look things up:
 
@@ -266,22 +295,9 @@ results/stride/runs/base_32node_s17_<date>_<time>/test/<date>_<time>/
 Read `real_directed_test/<tm_id>_eval_metrics.csv`. The undirected variants sum a
 link's capacity across both directions and hide one-way saturation.
 
-### What happens without `--model`
-
-It reads `results/stride/model`, the live directory every training run
-overwrites — you would be measuring whichever training finished last. And since
-there is no run to attach to, **the session opens a run directory of its own**:
-
-```
-results/stride/runs/base_32node_s17_<date>_<time>/
-└── test/<date>_<time>/          ← a test/ with no train/ beside it
-```
-
-A directory under `runs/` holding only `test/` is exactly this case, and which
-checkpoint it scored is knowable only from the sha256 in its `ckpt.txt`.
-
 Baselines with nothing to load (`ospf`, `ilp`, `widest_path`, `drsir`) are run
-without `--model` by design, and that directory shape is normal for them.
+without `--model` by design. Their run directories hold a `test/` and no `train/`,
+which is what a run with no training phase looks like.
 
 ## 11. Figures and tables
 
@@ -305,32 +321,6 @@ The reward curves are the one group that reads training logs rather than test
 sessions; they go through `paper/figures/reward/make_curves_csv.py`, whose
 `RUN_MAP` lists which run each curve comes from.
 
-## clean, train and test in one command
-
-```bash
-./scripts/run_chain.sh                                  # 32node + stride
-./scripts/run_chain.sh geant_directed stride            # another env
-./scripts/run_chain.sh 32node_144tm_directed stride 18  # another seed
-STRIDE_CHUNK=4 ./scripts/run_chain.sh                   # with an override
-```
-
-`clean.sh`, train, `clean.sh`, test the checkpoint that training just produced,
-`clean.sh`.
-
-**It finds the checkpoint itself.** A run directory's name carries a timestamp
-nobody knows in advance, so the script lists `runs/` before training and takes the
-difference afterwards. Taking "the newest" would quietly test the wrong
-checkpoint whenever something else had touched an older directory, and a test
-against the wrong checkpoint looks exactly like a test against the right one. If
-the difference is not exactly one directory it stops rather than guessing.
-
-sudo is asked for once at the start and refreshed in the background, so an
-eight-hour run does not halt at a password prompt hours after you left. The
-`STRIDE_*` variables are passed as explicit `VAR=value` assignments, since
-`sudo -E` does not carry them reliably.
-
-Run it inside tmux as usual; the controller and the agent open windows beside it.
-
 ## If the update does not fit in 10 s
 
 The monitoring period is 10 s and both inference and the update have to finish
@@ -351,7 +341,7 @@ dataset/     topologies, traffic matrices, frozen candidate paths — inputs, ne
 results/     everything a run produces; runs/<name>/{train,test} are the archives,
              the rest of results/<alg>/ is live scratch the controller and agent
              exchange files through
-paper/       figure and table generators (the thesis itself is not published -- paper/README.md)
+paper/       figure and table generators — see paper/README.md
 docs/        methodology notes, including the dead ends and why they failed
 ```
 
