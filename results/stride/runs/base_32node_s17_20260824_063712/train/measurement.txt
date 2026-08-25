@@ -1,0 +1,9 @@
+metrics_files      6008
+last_measurement   2026-08-24 06:37:06
+training_finished  2026-08-24 06:37:12
+stale_seconds      5
+
+stale_seconds is how long before training ended the controller last
+wrote a measurement. More than a few monitoring periods means the agent
+spent that time reading a frozen file, and the run is not usable however
+healthy its reward curve looks.

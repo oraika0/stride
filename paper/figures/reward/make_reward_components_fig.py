@@ -37,6 +37,7 @@ DIV          = 100           # each term is logged in [0,100]; /100 -> [0,1], to
 
 # one STRIDE seed per topology
 TOPO_RUN = {"geant": "stride_geant_s17", "32node": "stride_32node_s17"}
+# TOPO_RUN = {"geant": "stride_geant_s17", "32node": "stride_32node_v100"}
 
 # per-topology display knobs
 TOPO_CFG = {

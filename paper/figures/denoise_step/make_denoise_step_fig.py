@@ -34,9 +34,10 @@ SESS_DIR = ""          # session paths below are already repo-relative        # 
 # the per-step plot uses seed 17 (the headline baseline). M8-s18 is named
 # "pma2seed18" (not "pma2_M8_s18") -- it is the plain PMA-2 baseline at seed 18.
 SESSIONS = {
-    4:  {17: "results/stride/runs/M4_32node_s17_20260607_080043/test/20260607_164306",  18: "results/stride/runs/M4_32node_s18_20260607_162228/test/20260607_171504"},  # s19 MISSING
+    4:  {17: "results/stride/runs/M4_32node_s17_20260607_080043/test/20260607_164306",  18: "results/stride/runs/M4_32node_s18_20260607_162228/test/20260607_171504"},
     6:  {17: "results/stride/runs/M6_32node_s17_20260610_080844/test/20260610_093851",  18: "results/stride/runs/M6_32node_s18_20260611_032312/test/20260611_124930"},
     8:  {17: "results/stride/runs/base_32node_s17_20260605_114040/test/20260605_121029",  18: "results/stride/runs/base_32node_s18_20260605_221156/test/20260606_001602"},
+    # 8:  {17: "results/stride/runs/base_32node_s17_20260605_114040/test/20260605_121029",  18: "results/stride/runs/base_32node_s18_20260605_221156/test/20260606_001602", 99: "results/stride/runs/base_32node_s17_20260824_063712/test/20260824_083547"},
     10: {17: "results/stride/runs/M10_32node_s17_20260610_080811/test/20260610_093804", 18: "results/stride/runs/M10_32node_s18_20260611_040040/test/20260611_125017"},
     12: {17: "results/stride/runs/M12_32node_s17_20260607_075829/test/20260608_094621", 18: "results/stride/runs/M12_32node_s18_20260609_002014/test/20260609_003659"},
 }
@@ -47,7 +48,9 @@ FIG_NAME = "Figure 18. Denoise-step performance on 32-node"
 TBL_NAME = "Table 10. Denoise-step performance on 32-node"
 
 TABLE_SEEDS = (17, 18)                          # mean+-std table uses these seeds
+# TABLE_SEEDS = (17, 18, 99)                          # mean+-std table uses these seeds
 BAR_SEEDS = (17, 18)                            # bar plot averages all available of these
+# BAR_SEEDS = (17, 18, 99)                            # bar plot averages all available of these
 ILP_32, OSPF_32 = 66.0, 99.4                    # 32node directed baselines (reference lines)
 # M8 = STRIDE green (#479a5f, matches holdout) since M8 is the chosen config;
 # the rest are high-contrast distinct hues (purple/blue/orange/red).

@@ -106,6 +106,7 @@ RUN_MAP = {
     "ls2ic_32node_s18":    ("32node", "results/ls2ic_dd/runs/ls2ic_dd_32node_s18_20260611_122711/train", 992),
     "madqn_32node_s17":    ("32node", "results/ps_dqn_dd/runs/ps_dqn_dd_32node_s17_20260618_233958/train", 992),
     "madqn_32node_s18":    ("32node", "results/ps_dqn_dd/runs/ps_dqn_dd_32node_s18_20260630_021144/train", 992),
+    "stride_32node_v100":   ("32node", "results/stride/runs/base_32node_s17_20260824_063712/train", 992),
 }
 
 REWARD_SCALE = 100.0   # per-pair mean -> the [0,300] scale the figures divide by

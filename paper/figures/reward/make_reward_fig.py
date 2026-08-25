@@ -65,10 +65,9 @@ RUNS = {
         ("MADQN (seed 18)",  "madqn_geant_s18", "MADQN"),
     ],
     "32node": [
-        # ("STRIDE (seed 16)", "tzsabapp", "STRIDE"),
         ("STRIDE (seed 17)", "stride_32node_s17", "STRIDE"),
-        ("STRIDE (seed 18)", "stride_32node_s18", "STRIDE"),   # holdout 32node s18 (seed=18, pc2)
-        # ("STRIDE (seed 19)", "wyb98o6h", "STRIDE"),
+        ("STRIDE (seed 18)", "stride_32node_s18", "STRIDE"),
+        ("STRIDE (seed 17)", "stride_32node_v100", "STRIDE_v100"),
         ("LS2IC (seed 17)",  "ls2ic_32node_s17", "LS2IC"),
         ("LS2IC (seed 18)",  "ls2ic_32node_s18", "LS2IC"),
         ("MADQN (seed 17)",  "madqn_32node_s17", "MADQN"),

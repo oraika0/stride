@@ -63,9 +63,11 @@ _METHODS = {
     ("ILP",    ["results/ilp/runs/ilp_geant_s17_20260528_132121/test/20260528_132121"]),
   ],
   "32node": [
-    ("STRIDE", ["results/stride/runs/base_32node_s17_20260605_114040/test/20260605_121029",          # seed 17
+    ("STRIDE", ["results/stride/runs/base_32node_s17_20260605_114040/test/20260605_121029",   # seed 17
                 "results/stride/runs/base_32node_s18_20260605_221156/test/20260606_001602",   # seed 18
                 ]),
+    # ("STRIDE_v100", ["results/stride/runs/base_32node_s17_20260824_063712/test/20260824_083547"    # seed 17 (32node, v100)
+    #             ]),            
     ("LS2IC",  ["results/ls2ic_dd/runs/ls2ic_dd_32node_s17_20260627_113519/test/20260627_161008",   # seed 17
                 "results/ls2ic_dd/runs/ls2ic_dd_32node_s18_20260611_122711/test/20260611_132255"]),        # seed 18
     ("MADQN",  ["results/ps_dqn_dd/runs/ps_dqn_dd_32node_s17_20260618_233958/test/20260619_160116",  # seed 17 (fix)

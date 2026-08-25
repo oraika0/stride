@@ -1,0 +1,7 @@
+model_dir: /home/dcnlab/stride/results/stride/runs/base_32node_s17_20260824_063712/train/model
+sha256 47620444deb1b8494c6d5a1b3ea3ba3730111407744863918536bf529930c8cf  stride_ckpt.pt
+decode: greedy
+variant: base
+topology: 32node
+seed: 17
+loaded_at: 2026-08-24T08:35:47
