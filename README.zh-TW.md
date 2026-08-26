@@ -188,7 +188,53 @@ python dataset/prepare_dataset.py --topology geant  --tms 24tm --tm_scale 3
 
 ---
 
-## 3. 目錄結構
+## 3. 架構與目錄結構
+
+### 跑起來是三個行程
+
+一次 real 實驗會開三個 tmux 視窗。你啟動的是 `main`，另外兩個由它開出來。
+
+```text
+                       main.py  (sudo)
+             建拓樸、送 iperf3 流量、最後收拾
+                     |                  |
+                  開 |                  | 開
+                     v                  v
+              +------------+      +------------+
+              | controller |      |    drl     |
+              |ryu-manager |      | run_drl.py |
+              +------------+      +------------+
+                     |                  ^
+                     |   net_info_directed.csv
+                     |   paths_metrics.json
+                     +----------------->+
+                     ^                  |
+                     +--drl_paths.json--+
+```
+
+| 視窗 | 是什麼 | 負責 |
+| --- | --- | --- |
+| `main` | `main.py`，需要 sudo | 建拓樸、把另外兩個開起來、驅動 iperf3 流量、結束時收拾 Mininet 與 `ryu-manager`，並把 `results/` 的擁有者改回你 |
+| `controller` | `ryu-manager --observe-link`，載入 `utils/` 底下那些 app | 量測網路（用量、延遲、丟包）、維護拓樸、把 agent 選的路徑裝成流表 |
+| `drl` | `run_drl.py`，就是 agent | 讀鏈路狀態、為每個源-目標對選一條候選路徑、訓練 |
+
+**三個行程之間沒有 socket，全部靠檔案。** controller 把量測寫進
+`results/<alg>/net_info_directed.csv` 與 `paths_metrics.json`，agent 把決策寫進
+`drl_paths.json`，controller 再照著裝流表。這個交換區就是 `scripts/clean.sh` 清的東西，
+也是好幾個坑的來源（見 `docs/controller_stops_measuring.md`）。
+
+先後順序。
+
+1. `main` 建 Mininet 拓樸
+2. 開 `controller`，然後**等 30 秒** —— 讓拓樸發現與第一輪 port 統計先完成
+3. 開 `drl`
+4. `main` 開始送 iperf3 流量，一直循環到 agent 寫下 `.drl_done`
+5. `main` 收拾 Mininet 與 `ryu-manager`，把 `results/` 的擁有者改回你
+
+錯誤只會出現在**它自己那個 pane**。controller 死掉的話 `main` 與 `drl` 都不會有任何提示，
+所以看起來還在跑不代表還在量。
+
+### 目錄
 
 ```text
 main.py                  進入點，建拓樸、啟動 controller 與 agent

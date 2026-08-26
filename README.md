@@ -210,7 +210,58 @@ python dataset/prepare_dataset.py --topology geant  --tms 24tm --tm_scale 3
 
 ---
 
-## 3. Repository layout
+## 3. Architecture and layout
+
+### A run is three processes
+
+A real run opens three tmux windows. You start `main`, and it opens the other two.
+
+```text
+                       main.py  (sudo)
+          builds the topology, drives the iperf3 traffic,
+                    tears everything down
+                     |                  |
+              spawns |                  | spawns
+                     v                  v
+              +------------+      +------------+
+              | controller |      |    drl     |
+              |ryu-manager |      | run_drl.py |
+              +------------+      +------------+
+                     |                  ^
+                     |   net_info_directed.csv
+                     |   paths_metrics.json
+                     +----------------->+
+                     ^                  |
+                     +--drl_paths.json--+
+```
+
+| Window | What it is | Responsible for |
+| --- | --- | --- |
+| `main` | `main.py`, needs sudo | building the topology, spawning the other two, driving the iperf3 traffic, and on exit tearing down Mininet and `ryu-manager` and chowning `results/` back to you |
+| `controller` | `ryu-manager --observe-link` with the apps under `utils/` | measuring the network (utilisation, delay, loss), maintaining the topology, installing the agent's chosen paths as flow rules |
+| `drl` | `run_drl.py`, the agent itself | reading link state, choosing one candidate path per source-destination pair, training |
+
+**There is no socket between the three. It is all files.** The controller writes
+its measurements to `results/<alg>/net_info_directed.csv` and
+`paths_metrics.json`, the agent writes its decisions to `drl_paths.json`, and the
+controller installs those. That exchange area is what `scripts/clean.sh` clears,
+and it is the source of several pitfalls (see
+`docs/controller_stops_measuring.md`).
+
+The order.
+
+1. `main` builds the Mininet topology
+2. it spawns `controller`, then **waits 30 seconds** — so topology discovery and
+   the first round of port stats complete first
+3. it spawns `drl`
+4. `main` starts the iperf3 traffic and loops until the agent writes `.drl_done`
+5. `main` tears down Mininet and `ryu-manager` and chowns `results/` back to you
+
+Errors appear only in **their own pane**. If the controller dies, neither `main`
+nor `drl` gives any sign, so a run that looks alive is not necessarily still
+measuring.
+
+### Layout
 
 ```text
 main.py                  Entry point: builds topology, spawns controller + agent
