@@ -19,21 +19,24 @@ adaptive Dijkstra、mean-field，以及靜態 ILP oracle）、評估流程，還
 
 以下為開發機實測版本。
 
-| 元件 | 版本 | 備註 |
-| --- | --- | --- |
-| 作業系統 | Ubuntu 20.04 | 系統預設 Python 3.8，Mininet 需要 |
-| Python | 3.8.20 | conda 環境，見 §2.2 |
-| Mininet | 2.3.1b1 | 系統層安裝，**不在** conda 裡 |
-| Open vSwitch | 2.13.8 | 系統 daemon |
-| Ryu | 4.34 | pip 安裝，**需要手動 patch**，見 §2.3 |
-| PyTorch | 2.0.1+cu118 | CUDA 11.8 |
-| GPU | NVIDIA RTX 3060 Ti，8 GB | 論文所有數字都是在這台上量的 |
+| 元件 | 版本 |
+| --- | --- |
+| 作業系統 | Ubuntu 20.04 |
+| Python | 3.8.20 |
+| Mininet | 2.3.1b1 |
+| Open vSwitch | 2.13.8 |
+| Ryu | 4.34 |
+| PyTorch | 2.0.1+cu118 |
+| GPU | NVIDIA RTX 3060 Ti，8 GB |
+
+Python 與 PyTorch 在 conda 環境裡（§2.2），Mininet 與 Open vSwitch 在系統層。Ryu 裝在
+conda 環境裡，而且**需要手動 patch**（§2.3）。
 
 真實 Mininet 實驗另外需要 `sudo`，以及 kernel 提供 `openvswitch`、`veth`、`sch_netem`
 三個模組。一般桌面 Linux 發行版都有，**WSL2 跟精簡版 cloud kernel 沒有**。
 
 真實環境每一步有硬性的時間預算。agent 必須在一個 monitoring period（10 秒）之內完成觀
-測、決策與更新，否則就落後於它正在調度的流量。在上面那張卡上，一次路由決策約 22 ms，
+測、決策與更新，否則就落後於它正在調度的流量。在 RTX 3060 Ti 上，一次路由決策約 22 ms，
 32-node 一整步約 4.2 秒。不要假設純 CPU 的機器塞得進這個預算，要先實測再相信它跑出來
 的曲線。
 
@@ -55,6 +58,10 @@ mn --version                              # 2.3.0
 sudo mn --test pingall                    # 驗證
 ```
 
+`universe` 是 Ubuntu 的社群套件庫，Mininet 在裡面，預設不一定啟用。第二行裝 Mininet 與
+Open vSwitch 本體。第三行讓 Open vSwitch 的 daemon 立刻啟動、並設成開機自動啟動 ——
+沒有它在跑，Mininet 建不出 switch。
+
 **不要**在這裡跑 Mininet 的 `install.sh`：它會先卡 pep8/pycodestyle、再卡 PEP 668，
 而每一種繞法都比直接用套件更糟。2.3.0 就夠了 —— 這個 repo 只用到
 `Mininet(controller=RemoteController, link=TCLink)` 跟 `addLink(bw=, max_queue_size=)`。
@@ -71,9 +78,11 @@ python -c "from mininet.net import Mininet; from mininet.link import TCLink; \
            from mininet.node import RemoteController; print('ok')"
 ```
 
-Mininet 的 python 部分是純 python、目標 3.6+，所以 3.8 的直譯器讀得懂 3.12 的安裝。
-編譯的部分 `mnexec` 是 `PATH` 上的執行檔，從來不被 import。§2.2 的 `.pth` 那步跳過，
-其餘完全一樣。
+`ln -sfn` 在 conda 環境的 site-packages 裡建一個指向系統 Mininet 的 symlink，讓 conda
+的 python 找得到它。只接進 Mininet 這一個套件，不會把系統為 3.12 裝的其他東西一起攤開。
+第二個指令是驗證，印出 `ok` 才算成功。
+
+**走這條路線的話，§2.2 的 `.pth` 那一步跳過**，其餘完全一樣。
 
 #### Ubuntu 20.04 —— 從原始碼
 
@@ -84,18 +93,18 @@ cd util && ./install.sh -a
 sudo mn --test pingall
 ```
 
-`install.sh -a` 會一併裝 Open vSwitch，需要 20~40 分鐘。裝完再做 §2.2 的 `.pth`。
+`install.sh -a` 會一併裝 Open vSwitch。裝完再做 §2.2 的 `.pth`。
 
 #### 這些東西最後落在哪
 
 在共用機器上值得知道：
 
-| | 位置 | 你的還是大家的 |
+| 元件 | 路徑 | 安裝位置 |
 | --- | --- | --- |
-| Ryu 與它的 patch | `$CONDA_PREFIX/lib/python3.8/site-packages/ryu/` | **你的** —— 在 env 裡面，env 外一個檔案都不會被動到 |
-| Mininet 套件 | `/usr/local/lib/python3.8/dist-packages`（原始碼）或 `/usr/lib/python3/dist-packages`（apt） | 共用 |
-| `mnexec`、`ovs-*` | `/usr/bin` | 共用 |
-| Mininet 原始碼樹 | 你 clone 的地方 | 你的，而且**裝完就可以刪** |
+| Ryu 與它的 patch | `$CONDA_PREFIX/lib/python3.8/site-packages/ryu/` | conda env —— env 以外一個檔案都不會被動到 |
+| Mininet 套件 | `/usr/local/lib/python3.8/dist-packages`（原始碼）或 `/usr/lib/python3/dist-packages`（apt） | system |
+| `mnexec`、`ovs-*` | `/usr/bin` | system |
+| Mininet 原始碼樹 | 你 clone 的地方 | 本機目錄，**裝完就可以刪** |
 
 只有 clone 的位置由你決定 —— 上面的指令放在 repo 底下被 gitignore 的 `src/`，這樣你在
 這台機器上加的東西除了系統套件之外都集中在一個目錄，
@@ -130,8 +139,13 @@ conda 自己的 numpy/torch 在 `sys.path` 上優先級較高，只有 Mininet �
 
 ### 2.3 Ryu + 延遲量測 patch
 
-Controller 靠 LLDP 封包的往返時間量測每條 link 的延遲，而上游 Ryu 沒有記錄這件事：
+Controller 靠 LLDP 封包的往返時間量測每條 link 的延遲，而上游 Ryu 沒有記錄這件事。
 `PortData` 只記下封包**送出**的時間，`lldp_packet_in_handler` 從不記回來的時間。
+
+> **論文採用的 per-link delay 不是 LLDP 這條。** LLDP 在穩態下系統性低估，大約只有真值
+> 的三分之一，論文改用 tc backlog 作為 ground truth，見
+> [`docs/delay_measurement_issues.md`](docs/delay_measurement_issues.md)。patch 還是要打
+> —— controller 這條路徑照樣會算 LLDP delay，沒打就讀成 0。
 
 ```bash
 git clone https://github.com/faucetsdn/ryu src/ryu
@@ -145,17 +159,16 @@ python scripts/patch_ryu.py
 有相容性修正，但之後再也沒發布過，所以 git tree 是唯一能用的來源。
 
 兩個 pin 是各自獨立、而且都必要。`setuptools==58.0.0`：ryu 的 `setup.py` 呼叫
-`easy_install.get_script_args`，那個 API 在 setuptools 58 之後被移除；`--no-build-isolation`
+`easy_install.get_script_args`，那個 API 在 setuptools 58 之後被移除。`--no-build-isolation`
 則是讓建置看得到這個 pin，而不是用 pip 另外抓的最新版。`pbr==5.11.1`：ryu 寫了
 `setup_requires=['pbr']` 且沒指定版本，而 `setup_requires` 是 setuptools 自己的機制、
 不是 pip 的 —— 它會在建置當下把最新的 pbr 抓進 `src/ryu/.eggs/`，`--no-build-isolation`
-管不到；新版 pbr 會 import `setuptools.extern.tomli`，而 setuptools 要到 61 才開始
+管不到。新版 pbr 會 import `setuptools.extern.tomli`，而 setuptools 要到 61 才開始
 vendor 它。事先裝好 pbr 就滿足了需求，不會再去抓。
 
 腳本會在已安裝的套件裡做三處插入 —— `PortData` 加一個 `delay` 欄位、handler 開頭取
 接收時間戳、以及填進那個欄位的相減 —— 然後**重新 import 該模組確認改動生效**。它是
-idempotent 的，會把未改動的檔案留成 `switches.py.orig`，`--revert` 可以還原。如果檔案
-長得不像它預期的 4.34，它會拒絕執行而不是亂猜。
+idempotent 的，會把未改動的檔案留成 `switches.py.orig`，`--revert` 可以還原。
 
 隨時可以驗證：
 
@@ -167,8 +180,6 @@ python scripts/patch_ryu.py --check      # exit 0 = 已 patch
 > 0，訓練對著一個常數最佳化，而整個過程看起來一切正常。長時間訓練之前先檢查，不要
 > 事後才發現。
 
-因為 Ryu 是 pip 套件，這個 patch 只存在於你的 conda 環境裡 —— env 以外不會寫入任何
-東西，環境重建就再跑一次腳本。
 
 ### 2.4 Controller 路徑
 
@@ -195,24 +206,25 @@ python dataset/prepare_dataset.py --topology geant  --tms 24tm --tm_scale 3
 一次 real 實驗會開三個 tmux 視窗。你啟動的是 `main`，另外兩個由它開出來。
 
 ```text
-                       main.py  (sudo)
-             建拓樸、送 iperf3 流量、最後收拾
-                     |                  |
-                  開 |                  | 開
-                     v                  v
-              +------------+      +------------+
-              | controller |      |    drl     |
-              |ryu-manager |      | run_drl.py |
-              +------------+      +------------+
-                     |                  ^
-                     |   net_info_directed.csv
-                     |   paths_metrics.json
-                     +----------------->+
-                     ^                  |
-                     +--drl_paths.json--+
+                            main.py   (sudo)
+                  建拓樸、送 iperf3 流量、最後收拾
+                     |                                  |
+                  開 |                                  | 開
+                     v                                  v
+          +-------------------+              +-------------------+
+          |    controller     |              |        drl        |
+          |    ryu-manager    |              |     run_drl.py    |
+          +-------------------+              +-------------------+
+                     |                                  ^
+                     |    net_info_directed.csv         |
+                     |    paths_metrics.json            |
+                     +--------------------------------->+
+                     |                                  |
+                     ^           drl_paths.json         |
+                     +----------------------------------+
 ```
 
-| 視窗 | 是什麼 | 負責 |
+| 視窗 | 行程 | 職責 |
 | --- | --- | --- |
 | `main` | `main.py`，需要 sudo | 建拓樸、把另外兩個開起來、驅動 iperf3 流量、結束時收拾 Mininet 與 `ryu-manager`，並把 `results/` 的擁有者改回你 |
 | `controller` | `ryu-manager --observe-link`，載入 `utils/` 底下那些 app | 量測網路（用量、延遲、丟包）、維護拓樸、把 agent 選的路徑裝成流表 |
@@ -220,19 +232,20 @@ python dataset/prepare_dataset.py --topology geant  --tms 24tm --tm_scale 3
 
 **三個行程之間沒有 socket，全部靠檔案。** controller 把量測寫進
 `results/<alg>/net_info_directed.csv` 與 `paths_metrics.json`，agent 把決策寫進
-`drl_paths.json`，controller 再照著裝流表。這個交換區就是 `scripts/clean.sh` 清的東西，
-也是好幾個坑的來源（見 `docs/controller_stops_measuring.md`）。
+`drl_paths.json`，controller 再照著裝流表。
 
 先後順序。
 
 1. `main` 建 Mininet 拓樸
 2. 開 `controller`，然後**等 30 秒** —— 讓拓樸發現與第一輪 port 統計先完成
 3. 開 `drl`
-4. `main` 開始送 iperf3 流量，一直循環到 agent 寫下 `.drl_done`
+4. `main` 開始送 iperf3 流量。agent 到這時才有東西可量，訓練從這裡實質展開，並一直循環
+   到 agent 寫下 `.drl_done`
 5. `main` 收拾 Mininet 與 `ryu-manager`，把 `results/` 的擁有者改回你
 
-錯誤只會出現在**它自己那個 pane**。controller 死掉的話 `main` 與 `drl` 都不會有任何提示，
-所以看起來還在跑不代表還在量。
+**三個 pane 的錯誤各自獨立，三個都要看。** 沒有誰會回報誰的狀況。controller 掛掉的話
+`main` 與 `drl` 什麼都不會印，照樣前進。agent 掛掉的話 `main` 會一直送流量，等一個永遠
+不會出現的 `.drl_done`。任何一個 pane 安靜，不代表它還活著。
 
 ### 目錄
 
@@ -428,7 +441,7 @@ agent 都在對著凍結的檔案訓練。見
 
 **檔名就是參數值。** `config/__init__.py` 在 import 時走過這三個目錄，凡是有匯出一個叫
 `config` 的 dict 的檔案，就把「檔名去掉 `_config`」註冊成一個可用的 key。沒有任何名單
-需要同步維護。把 `config/env/mytopo_config.py` 丟進目錄，`--env mytopo` 就能用；把檔案
+需要同步維護。把 `config/env/mytopo_config.py` 丟進目錄，`--env mytopo` 就能用。把檔案
 刪掉，那個 key 就消失。`main.py` 接著把三個 dict 合併成一個交給 `run_drl.py`。
 
 所以可用的 key 就等於目錄裡實際有哪些檔案。

@@ -22,15 +22,19 @@ table in the paper.
 
 Verified on the development machine:
 
-| Component | Version | Notes |
-| --- | --- | --- |
-| OS | Ubuntu 20.04 | Python 3.8 is the system default, which Mininet needs |
-| Python | 3.8.20 | conda env, see §2.2 |
-| Mininet | 2.3.1b1 | system-wide install, **not** in conda |
-| Open vSwitch | 2.13.8 | system daemon |
-| Ryu | 4.34 | pip, **requires a local patch**, see §2.3 |
-| PyTorch | 2.0.1+cu118 | CUDA 11.8 |
-| GPU | NVIDIA RTX 3060 Ti, 8 GB | the machine every reported number was measured on |
+| Component | Version |
+| --- | --- |
+| OS | Ubuntu 20.04 |
+| Python | 3.8.20 |
+| Mininet | 2.3.1b1 |
+| Open vSwitch | 2.13.8 |
+| Ryu | 4.34 |
+| PyTorch | 2.0.1+cu118 |
+| GPU | NVIDIA RTX 3060 Ti, 8 GB |
+
+Python and PyTorch live in the conda environment (§2.2), Mininet and Open vSwitch
+at system level. Ryu is installed into the conda environment and **requires a
+manual patch** (§2.3).
 
 Real Mininet experiments additionally need `sudo`, and a kernel providing the
 `openvswitch`, `veth` and `sch_netem` modules (standard on desktop Linux
@@ -38,7 +42,7 @@ distributions; **not** available under WSL2 or minimal cloud kernels).
 
 A real run has a hard per-step budget: the agent must observe, decide and update
 inside one monitoring period (10 s), or it falls behind the traffic it is
-supposed to be routing. On the GPU above, one routing decision takes ~22 ms and a
+supposed to be routing. On an RTX 3060 Ti, one routing decision takes ~22 ms and a
 32-node step ~4.2 s end to end. Do not assume a CPU-only machine fits in the
 budget — verify it before trusting a curve produced on one.
 
@@ -60,6 +64,11 @@ mn --version                              # 2.3.0
 sudo mn --test pingall                    # verify
 ```
 
+`universe` is Ubuntu's community repository, where Mininet lives, and it is not
+always enabled by default. The second line installs Mininet and Open vSwitch
+themselves. The third starts the Open vSwitch daemon and sets it to start at
+boot — without it running, Mininet cannot create switches.
+
 Do **not** run Mininet's `install.sh` here: it fails on pep8/pycodestyle and then
 on PEP 668, and every workaround is worse than the packages. 2.3.0 is enough —
 this repository only calls `Mininet(controller=RemoteController, link=TCLink)`
@@ -78,9 +87,12 @@ python -c "from mininet.net import Mininet; from mininet.link import TCLink; \
            from mininet.node import RemoteController; print('ok')"
 ```
 
-Mininet's Python side is pure Python and targets 3.6+, so a 3.8 interpreter reads
-the 3.12 install without trouble. The compiled part, `mnexec`, is a binary on
-`PATH` and never imported. Skip §2.2's `.pth` step; everything else is the same.
+`ln -sfn` puts a symlink to the system Mininet inside the conda environment's
+site-packages so the conda interpreter can find it. Only Mininet is linked in,
+not everything else installed for 3.12. The second command is the check — it must
+print `ok`.
+
+**On this route, skip §2.2's `.pth` step.** Everything else is the same.
 
 #### Ubuntu 20.04 — from source
 
@@ -91,19 +103,19 @@ cd util && ./install.sh -a
 sudo mn --test pingall
 ```
 
-`install.sh -a` installs Open vSwitch too, and takes 20–40 minutes. Then do
+`install.sh -a` installs Open vSwitch too. Then do
 §2.2's `.pth` step so the conda env can see it.
 
 #### Where all of this ends up
 
 Worth knowing on a shared machine:
 
-| | where | yours or everyone's |
+| Component | Path | Installed into |
 | --- | --- | --- |
-| Ryu, and its patch | `$CONDA_PREFIX/lib/python3.8/site-packages/ryu/` | **yours** — inside the env, nothing outside it is touched |
-| Mininet package | `/usr/local/lib/python3.8/dist-packages` (source) or `/usr/lib/python3/dist-packages` (apt) | shared |
-| `mnexec`, `ovs-*` | `/usr/bin` | shared |
-| the Mininet source tree | wherever you cloned it | yours, and **deletable once installed** |
+| Ryu, and its patch | `$CONDA_PREFIX/lib/python3.8/site-packages/ryu/` | conda env — nothing outside it is touched |
+| Mininet package | `/usr/local/lib/python3.8/dist-packages` (source) or `/usr/lib/python3/dist-packages` (apt) | system |
+| `mnexec`, `ovs-*` | `/usr/bin` | system |
+| the Mininet source tree | wherever you cloned it | a local directory, **deletable once installed** |
 
 Only the clone location is up to you — the command above puts it in the
 repository's gitignored `src/`, so everything you added to the machine except the
@@ -143,8 +155,15 @@ otherwise every real-environment run dies at `from mininet.net import Mininet`.
 ### 2.3 Ryu + delay patch
 
 The controller measures per-link latency from LLDP round-trip timing, which
-upstream Ryu records nowhere: `PortData` timestamps when a frame was *sent*, and
+upstream Ryu records nowhere. `PortData` timestamps when a frame was *sent*, and
 `lldp_packet_in_handler` never notes when the reply came back.
+
+> **The per-link delay the paper reports does not come from LLDP.** LLDP
+> underestimates systematically, reading about a third of the truth in steady
+> state, and tc backlog is used as ground truth instead — see
+> [`docs/delay_measurement_issues.md`](docs/delay_measurement_issues.md). The
+> patch is still required, because the controller computes the LLDP delay either
+> way and reads 0 without it.
 
 ```bash
 git clone https://github.com/faucetsdn/ryu src/ryu
@@ -172,9 +191,7 @@ The script makes three edits inside the installed package — a `delay` field on
 `PortData`, a receive timestamp at the top of the handler, and the subtraction
 that fills the field — then re-imports the module to confirm they took. It is
 idempotent, keeps the untouched file as `switches.py.orig`, and `--revert`
-restores it. If the file does not look like the 4.34 it was written against, it
-refuses rather than guessing, and §2.3 of the git history has the edits to make
-by hand.
+restores it.
 
 Verify at any time:
 
@@ -186,8 +203,6 @@ python scripts/patch_ryu.py --check      # exit 0 = patched
 > Every link delay reads 0, training optimises against a constant, and the run
 > looks healthy from start to finish. Check before a long run, not after.
 
-Because Ryu is a pip package, the patch lives inside your conda env — nothing is
-written outside it, and rebuilding the env means running the script again.
 
 ### 2.4 Controller path
 
@@ -217,25 +232,26 @@ python dataset/prepare_dataset.py --topology geant  --tms 24tm --tm_scale 3
 A real run opens three tmux windows. You start `main`, and it opens the other two.
 
 ```text
-                       main.py  (sudo)
-          builds the topology, drives the iperf3 traffic,
-                    tears everything down
-                     |                  |
-              spawns |                  | spawns
-                     v                  v
-              +------------+      +------------+
-              | controller |      |    drl     |
-              |ryu-manager |      | run_drl.py |
-              +------------+      +------------+
-                     |                  ^
-                     |   net_info_directed.csv
-                     |   paths_metrics.json
-                     +----------------->+
-                     ^                  |
-                     +--drl_paths.json--+
+                            main.py   (sudo)
+            builds the topology, drives the iperf3 traffic,
+                      tears everything down
+                     |                                  |
+              spawns |                                  | spawns
+                     v                                  v
+          +-------------------+              +-------------------+
+          |    controller     |              |        drl        |
+          |    ryu-manager    |              |     run_drl.py    |
+          +-------------------+              +-------------------+
+                     |                                  ^
+                     |    net_info_directed.csv         |
+                     |    paths_metrics.json            |
+                     +--------------------------------->+
+                     |                                  |
+                     ^           drl_paths.json         |
+                     +----------------------------------+
 ```
 
-| Window | What it is | Responsible for |
+| Window | Process | Responsible for |
 | --- | --- | --- |
 | `main` | `main.py`, needs sudo | building the topology, spawning the other two, driving the iperf3 traffic, and on exit tearing down Mininet and `ryu-manager` and chowning `results/` back to you |
 | `controller` | `ryu-manager --observe-link` with the apps under `utils/` | measuring the network (utilisation, delay, loss), maintaining the topology, installing the agent's chosen paths as flow rules |
@@ -244,9 +260,7 @@ A real run opens three tmux windows. You start `main`, and it opens the other tw
 **There is no socket between the three. It is all files.** The controller writes
 its measurements to `results/<alg>/net_info_directed.csv` and
 `paths_metrics.json`, the agent writes its decisions to `drl_paths.json`, and the
-controller installs those. That exchange area is what `scripts/clean.sh` clears,
-and it is the source of several pitfalls (see
-`docs/controller_stops_measuring.md`).
+controller installs those.
 
 The order.
 
@@ -254,12 +268,15 @@ The order.
 2. it spawns `controller`, then **waits 30 seconds** — so topology discovery and
    the first round of port stats complete first
 3. it spawns `drl`
-4. `main` starts the iperf3 traffic and loops until the agent writes `.drl_done`
+4. `main` starts the iperf3 traffic. Only now does the agent have anything to
+   measure, so training effectively begins here, and the loop runs until the
+   agent writes `.drl_done`
 5. `main` tears down Mininet and `ryu-manager` and chowns `results/` back to you
 
-Errors appear only in **their own pane**. If the controller dies, neither `main`
-nor `drl` gives any sign, so a run that looks alive is not necessarily still
-measuring.
+**The three panes fail independently, and all three need watching.** None of them
+reports on the others. If the controller dies, `main` and `drl` print nothing and
+carry on. If the agent dies, `main` keeps driving traffic and waits for a
+`.drl_done` that will never arrive. A quiet pane is not evidence of a live one.
 
 ### Layout
 
