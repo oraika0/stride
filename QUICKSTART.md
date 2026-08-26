@@ -350,7 +350,7 @@ A run directory name is the command that reproduces it: `base_32node_s17_...` is
 
 ---
 
-## Complete removal
+## Complete uninstall
 
 Ordered from what is yours alone to what the machine shares. The first part is
 safe on a shared machine. The second is not.

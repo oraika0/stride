@@ -451,8 +451,7 @@ ls config/env config/algs config/controller | sed 's/_config\.py//'
   `meanfield`、`ilp`
 - **ctrl**：`simple_monitor`
 
-seed 不屬於上面任何一層，它是命令列的 `--seed`，對所有演算法一視同仁。以前有四個
-`*_seed18` 設定檔，內容只有 `"seed": 18` 一行，因為 baseline 沒有自己的覆寫機制。
+seed 不屬於上面任何一層，它是命令列的 `--seed`，對所有演算法一視同仁。
 
 ### STRIDE 變體
 
@@ -467,16 +466,13 @@ seed 不屬於上面任何一層，它是命令列的 `--seed`，對所有演算
 "critic":        {"encoder_rl_grad_src": "critic"},
 ```
 
-變體只描述架構。topology 由 `--env` 決定，seed 由 `--seed` 決定，所以不存在
-`..._32node_seed18` 這種變體。那個組合是一次 run，不是一個設定。啟用哪個變體由
+變體只描述架構。topology 由 `--env` 決定，seed 由 `--seed` 決定。啟用哪個變體由
 `STRIDE_VARIANT` 環境變數決定，預設 `base`，名稱打錯會直接拋錯。
 
 ```bash
 STRIDE_VARIANT=M4 "$PY" main.py --env 32node_144tm_directed --alg stride --seed 18 train
 ```
 
-另外有兩個跟變體正交的測試期覆寫，讓同一個 checkpoint 可以在不同推論模式下評估，不必
-另外定義變體。`STRIDE_EVAL_SAMPLE`（greedy 或 sampled 解碼）與 `STRIDE_ATTN_KERNEL`。
 
 ---
 
@@ -540,26 +536,6 @@ session 結束時寫下的歸檔，旁邊的其他目錄都是即時交換區。
 
 ---
 
-### git 裡有什麼，以及新 run 怎麼處理
-
-`results/*/runs/` 有追蹤。論文背後的每一次 run 都在 repo 裡 —— 訓練 log、測試 session、
-checkpoint —— 所以 clone 下來不必先把實驗重跑一遍，就能重建每張圖、重新評估每個
-checkpoint。旁邊的即時暫存區（`results/<alg>/Metrics/`、`net_info*.csv` 等）不追蹤，
-因為每次 run 都會覆寫它，它屬於哪一次 run 無從得知。
-
-**新的 run 預設不推上去。** 沒有規則忽略它們，所以 `git status` 會把每個新 run 顯示成
-一行未追蹤目錄。除非那次 run 值得發布，否則就讓它留在那裡。
-
-值得發布的時候，**整個 run 目錄一起 commit**：
-
-```bash
-git add results/stride/runs/<name>          # 加目錄，不要加裡面的個別檔案
-```
-
-不要只加 log 不加 checkpoint。沒辦法重新評估的結果不算證據，而兩半各走各的正是一份
-歸檔失去意義的方式。代價是實在的 —— 一個 checkpoint 12 到 32 MB，之後換掉的話新舊兩份
-都會永遠留在歷史裡 —— 所以每個 run 決定一次，想清楚再決定。
-
 ## 7. 論文圖表
 
 ```text
@@ -569,7 +545,6 @@ paper/tables/build_paper_table.py   LP/ILP 比較表
 paper/figures/algo/                 演算法虛擬碼渲染
 ```
 
-每支產生器都從自己的檔案位置推導 repo 根目錄，所以整棵樹可以搬移或改名，不必改路徑。
 
 圖表腳本讀的是 `results/<alg>/runs/<run>/test/<session>/real/<tm>/...`，也就是**評估輸出**，不是
 訓練 log。reward 系列的圖是例外，它們讀的是訓練 log，透過
@@ -597,8 +572,7 @@ paper/figures/algo/                 演算法虛擬碼渲染
 `real_directed_test/<tm_id>_eval_metrics.csv`，`paper/figures/` 底下每一支腳本裡都寫著
 這條路徑。
 
-`sim_*` 是 NetworkX 的估算值。指標名稱裡的「NX」就是 NetworkX 的縮寫，跟網路領域的任何
-術語無關。它跟真實量測共用同一組路由決策，差別在於它是把佇列**模型化**而不是量測，所以
+`sim_*` 是 NetworkX 的估算值。指標名稱裡的「NX」就是 NetworkX 的縮寫。它跟真實量測共用同一組路由決策，差別在於它是把佇列**模型化**而不是量測，所以
 它的角色是交叉檢查，不會被當成報告數字。
 
 Geant 在 `tm_scale=3` 且為 directed 時的參考點。ILP 約 0.67，LP 約 0.67，最短路徑
@@ -620,18 +594,13 @@ dataset/extend_k_paths.py        建立 K=30 候選檔，同時保留凍結的 K
 
 ## 10. 已知陷阱
 
-- **`kpath_init`、`kpath_reset`、`get_link_features`** 是我們加進 vendored gym 環境的
-  方法，不是上游原本就有的。它們是 per-OD K 候選路徑的介面，**所有**演算法都會走到，
-  STRIDE 跟 baseline 都一樣，所以它們跟 STRIDE 沒有專屬關係。
-- **用 `SIGKILL` 殺掉 real 實驗**會讓 `results/` 變成 root 所有。用 `chown -R` 修復，
-  或直接跑 `clean.sh`。正常結束的話程式會自動改回來。
 - **機器太慢**可能讓 controller 錯過 30 秒的啟動視窗，之後 agent process 會出錯。照
   §4 的方式清乾淨再重跑。
 - **`sudo -E` 不保證傳遞環境變數**。一律用 `sudo -E "VAR=value" "$PY" ...` 的形式。
 
 ---
 
-## 11. 完全移除
+## 11. 完全卸載
 
 順序是從 **conda 環境**排到**系統套件**。前三步在共用機器上都安全，第四步不是。
 

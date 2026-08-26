@@ -508,8 +508,7 @@ At the time of writing:
 - **ctrl**: `simple_monitor`
 
 The seed is not part of any of these. It is `--seed` on the command line, for
-every algorithm alike. There used to be four `*_seed18` config files whose only
-content was `"seed": 18`, because the baselines had no override of their own.
+every algorithm alike.
 
 ### STRIDE variants
 
@@ -526,16 +525,12 @@ ablation changes:
 ```
 
 A variant is an architecture and nothing else. Topology comes from `--env` and
-the seed from `--seed`, so there is no `..._32node_seed18` variant — that
-combination is a run, not a configuration.
+the seed from `--seed`.
 
 ```bash
 STRIDE_VARIANT=M4 "$PY" main.py --env 32node_144tm_directed --alg stride --seed 18 train
 ```
 
-Two orthogonal test-time overrides exist so a single checkpoint can be evaluated
-under different inference modes without defining a new variant:
-`STRIDE_EVAL_SAMPLE` (greedy vs sampled decoding) and `STRIDE_ATTN_KERNEL`.
 
 ---
 
@@ -607,29 +602,6 @@ session; everything beside it is scratch.
 
 ---
 
-### What is in git, and what to do with a new run
-
-`results/*/runs/` is tracked. Every run behind the paper is in the repository --
-training logs, test sessions, checkpoints -- so a clone can rebuild every figure
-and re-evaluate every checkpoint without reproducing the experiments first. The
-live scratch beside it (`results/<alg>/Metrics/`, `net_info*.csv`, ...) is not:
-every run overwrites it, so which run it belongs to is unknowable.
-
-New runs are **not** pushed by default. Nothing ignores them, so `git status`
-shows each one as a single untracked directory line; leave them there unless the
-run is worth publishing.
-
-When one is, **commit the run directory whole**:
-
-```bash
-git add results/stride/runs/<name>          # the directory, not files inside it
-```
-
-Never a run's logs without its checkpoint. A result you cannot re-evaluate is not
-evidence, and the two halves drifting apart is how an archive stops being one.
-The cost is real -- a checkpoint is 12-32 MB and replacing it later leaves both
-copies in history forever -- so decide once, per run, deliberately.
-
 ## 7. Paper figures and tables
 
 ```text
@@ -639,8 +611,6 @@ paper/tables/build_paper_table.py   LP/ILP comparison tables
 paper/figures/algo/                 algorithm pseudocode rendering
 ```
 
-Every generator resolves the repository root from its own file location, so the
-tree can be moved or renamed without editing paths.
 
 Each generator names the sessions it reads outright, so which run a figure comes
 from is visible in the source. They read
@@ -689,8 +659,8 @@ averages out to something that looks fine. The paper reads
 `real_directed_test/<tm_id>_eval_metrics.csv` throughout, and every
 `paper/figures/` script has that path in it.
 
-`sim_*` is the NetworkX estimate — "NX" in metric names means NetworkX, not
-anything network-specific. It shares the routing decision with the real
+`sim_*` is the NetworkX estimate — "NX" in metric names means NetworkX. It
+shares the routing decision with the real
 measurement but models the queues instead of measuring them, so it is a
 cross-check, never a reported number.
 
@@ -713,12 +683,6 @@ dataset/extend_k_paths.py        build a K=30 candidate file while preserving th
 
 ## 10. Known pitfalls
 
-- **`kpath_init`, `kpath_reset`, `get_link_features`** are methods added to the
-  vendored gym environment, not upstream code. They are the per-OD K-candidate
-  interface that *every* algorithm here goes through, STRIDE and baselines alike,
-  so nothing about them is STRIDE-specific.
-- **Killing a real run with `SIGKILL`** leaves `results/` owned by root. Fix with
-  `chown -R`. A clean exit chowns it back automatically.
 - **A slow machine** can make the controller miss its 30-second startup window,
   after which the agent process errors out. Shut everything down (§4) and retry.
 - **`sudo -E` does not reliably forward variables.** Always use the
@@ -726,7 +690,7 @@ dataset/extend_k_paths.py        build a K=30 candidate file while preserving th
 
 ---
 
-## 11. Complete removal
+## 11. Complete uninstall
 
 The order runs from the **conda environment** to the **system packages**. The
 first three steps are safe on a shared machine. The fourth is not.
