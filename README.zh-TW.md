@@ -37,8 +37,7 @@ conda 環境裡，而且**需要手動 patch**（§2.3）。
 
 真實環境每一步有硬性的時間預算。agent 必須在一個 monitoring period（10 秒）之內完成觀
 測、決策與更新，否則就落後於它正在調度的流量。在 RTX 3060 Ti 上，一次路由決策約 22 ms，
-32-node 一整步約 4.2 秒。不要假設純 CPU 的機器塞得進這個預算，要先實測再相信它跑出來
-的曲線。
+32-node 一整步約 4.2 秒。純 CPU 的機器是否符合這個預算需要先實測，不應直接假設。
 
 ---
 
@@ -62,7 +61,7 @@ sudo mn --test pingall                    # 驗證
 Open vSwitch 本體。第三行讓 Open vSwitch 的 daemon 立刻啟動、並設成開機自動啟動 ——
 沒有它在跑，Mininet 建不出 switch。
 
-**不要**在這裡跑 Mininet 的 `install.sh`：它會先卡 pep8/pycodestyle、再卡 PEP 668，
+**不要**在這裡跑 Mininet 的 `install.sh`：它會先因 pep8/pycodestyle 失敗，再因 PEP 668 失敗，
 而每一種繞法都比直接用套件更糟。2.3.0 就夠了 —— 這個 repo 只用到
 `Mininet(controller=RemoteController, link=TCLink)` 跟 `addLink(bw=, max_queue_size=)`。
 
@@ -95,7 +94,7 @@ sudo mn --test pingall
 
 `install.sh -a` 會一併裝 Open vSwitch。裝完再做 §2.2 的 `.pth`。
 
-#### 這些東西最後落在哪
+#### 安裝後的檔案落點
 
 在共用機器上值得知道：
 
@@ -107,7 +106,7 @@ sudo mn --test pingall
 | Mininet 原始碼樹 | 你 clone 的地方 | 本機目錄，**裝完就可以刪** |
 
 只有 clone 的位置由你決定 —— 上面的指令放在 repo 底下被 gitignore 的 `src/`，這樣你在
-這台機器上加的東西除了系統套件之外都集中在一個目錄，
+這台機器上新增的檔案除了系統套件之外都集中在一個目錄，
 `install.sh` 跑完那 5 MB 就能刪掉。**安裝本身兩種方式都是系統層級的**：Mininet 要建
 network namespace、要接 Open vSwitch，本來就需要 root，這個 repo 改變不了。在共用
 server 上，先確認 Mininet 與 OVS 是不是已經裝好了，不要再裝第二份。
@@ -134,7 +133,7 @@ python -c "import mininet; print(mininet.__file__)"   # 必須成功
 ```
 
 conda 自己的 numpy/torch 在 `sys.path` 上優先級較高，只有 Mininet 會落到系統那份。
-**環境如果重建，這個檔案要重做**，否則每次 real 實驗都會死在
+**環境如果重建，這個檔案要重做**，否則每次 real 實驗都會中止於
 `from mininet.net import Mininet`。
 
 ### 2.3 Ryu + 延遲量測 patch
@@ -155,7 +154,7 @@ python scripts/patch_ryu.py
 ```
 
 **不是 `pip install ryu`。** PyPI 上最後一版是 2020 年的 4.34，早於 eventlet 0.30.3
-移除 `ALREADY_HANDLED`，裝下去會得到一個「裝得起來但 import 就死」的套件。上游 master
+移除 `ALREADY_HANDLED`，裝下去會得到一個能安裝但無法 import 的套件。上游 master
 有相容性修正，但之後再也沒發布過，所以 git tree 是唯一能用的來源。
 
 兩個 pin 是各自獨立、而且都必要。`setuptools==58.0.0`：ryu 的 `setup.py` 呼叫
@@ -243,9 +242,9 @@ python dataset/prepare_dataset.py --topology geant  --tms 24tm --tm_scale 3
    到 agent 寫下 `.drl_done`
 5. `main` 收拾 Mininet 與 `ryu-manager`，把 `results/` 的擁有者改回你
 
-**三個 pane 的錯誤各自獨立，三個都要看。** 沒有誰會回報誰的狀況。controller 掛掉的話
-`main` 與 `drl` 什麼都不會印，照樣前進。agent 掛掉的話 `main` 會一直送流量，等一個永遠
-不會出現的 `.drl_done`。任何一個 pane 安靜，不代表它還活著。
+**三個 pane 的錯誤各自獨立，三個都要看。** 任何一個都不會回報另外兩個的狀況。controller
+中止時，`main` 與 `drl` 不會輸出任何訊息，並繼續執行。agent 中止時，`main` 會持續送流量，
+等待一個不會出現的 `.drl_done`。某個 pane 沒有輸出，不代表該行程仍在運作。
 
 ### 目錄
 
@@ -333,7 +332,7 @@ sudo -E "STRIDE_VARIANT=nodiff" "$PY" main.py \
 | `sudo` | Mininet 要建立 network namespace 跟 veth pair，還要掛上 Open vSwitch，這些都需要 root 權限。 |
 | `-E` | sudo 預設的 `env_reset` 會丟掉你的環境變數。只有 `gnome` 這個 terminal backend 需要它 —— `DISPLAY`、`XAUTHORITY`、`DBUS_SESSION_BUS_ADDRESS` 要保留下來，否則 gnome-terminal 找不到它的 session bus。預設的 `tmux` backend 完全不需要這些。 |
 | `"$PY"`（絕對路徑） | `-E` **不會**保留 `PATH`。sudo 的 `secure_path` 會用一份固定的系統清單把 `PATH` 蓋掉。所以在 sudo 底下直接打 `python` 會找到系統的 Python 3.8，那份沒有 torch、沒有 numpy、也沒有 ryu。這也是為什麼**先 `conda activate stride` 沒有用**——activate 做的事就只是改 `PATH`，而 sudo 把 `PATH` 丟掉了。 |
-| `"STRIDE_VARIANT=..."` | 選擇架構。要寫成明確的 `VAR=value` 指派形式，不要只靠 `-E`。這個變數如果掉了，程式會靜默退回 `base`，不會報任何錯，但訓練的是錯的東西。 |
+| `"STRIDE_VARIANT=..."` | 選擇架構。要寫成明確的 `VAR=value` 指派形式，不要只靠 `-E`。這個變數若未傳入，程式會退回 `base` 且不會報錯，訓練的將是另一個架構。 |
 | `--seed` | 選擇 seed，對所有演算法都適用。它是一般參數，`sudo` 不會把它弄丟。不給就是 17。 |
 
 真實模式會印出 `Building topology ...` 接著 `Controller spawned, wait 30 s ...`，
@@ -384,21 +383,19 @@ STRIDE_VARIANT=M4 ./scripts/run_chain.sh                # 換架構
 32-node 3000 步大約八個半小時，加上五個測試 traffic matrix 約半小時。
 
 **它自己找得到 checkpoint。** run 目錄名字含時間戳，事前無從得知，所以腳本記下訓練前
-`runs/` 有哪些、訓練後比差集。用「最新的那個」會在別的東西碰過舊目錄時安靜地測錯，
+`runs/` 有哪些、訓練後比差集。用「最新的那個」會在其他程序碰過舊目錄時測到錯的 checkpoint，
 而測錯的結果看起來跟測對的一模一樣。新增不是剛好一個就中止，不猜。
 
 開頭問一次 sudo 密碼，之後背景每分鐘 refresh，八小時的訓練不會在你離開之後停在密碼
 提示。在 tmux 裡跑，controller 與 drl 會開成旁邊的視窗。
 
-跑完之後看三個地方就知道結果能不能用：
+跑完之後先看 `measurement.txt`，它決定這次結果能不能用。
 
 ```bash
-cat results/<alg>/runs/<run>/train/measurement.txt   # stale_seconds 應該是個位數
-ls  results/<alg>/runs/<run>/test/<session>/real/    # 五個 traffic matrix，各 154 個檔
-ls  results/_terminal_logs/                          # controller 與 agent 的完整輸出
+cat results/<alg>/runs/<run>/train/measurement.txt   # stale_seconds 應為個位數
 ```
 
-關鍵是 `measurement.txt`。controller 中途停止量測的 run 一樣會跑完全部步數、存下
+controller 中途停止量測的 run 一樣會跑完全部步數、存下
 checkpoint、畫出持續變動的 reward 曲線 —— 因為 reward 跟著 action 走，不是跟著網路走。
 `stale_seconds` 是訓練結束前多久最後一次量測落地，超過一個監控週期就代表那段時間
 agent 都在對著凍結的檔案訓練。見
@@ -414,14 +411,9 @@ agent 都在對著凍結的檔案訓練。見
 
 1. **先**殺卡住的 `main.py` / `run_drl.py`，再動 daemon
 2. `pkill -f ryu-manager`、iperf3、`mn -c`
-3. 驗證 6633/6653 兩個 port 確實釋放，沒釋放就大聲中止
+3. 驗證 6633/6653 兩個 port 確實釋放，未釋放則終止
 4. 把 `results/` 的擁有者改回來（sudo 執行會留下 root 檔案），並清掉 `.drl_done` 標記檔
 
-自己手動打 `killall` + `mn -c` 會漏掉第 1 步跟第 3 步，而那兩步才是關鍵。Ryu 實際上是
-以 `python` 這個 process name 執行的，`killall ryu-manager` 永遠抓不到它，卡在
-`net.stop()` 的東西也一樣抓不到。殘留會繼續佔住 controller port，導致**下一次執行**接
-到一個停滯的舊 controller，產出一條看起來合理但其實是垃圾的訓練曲線，而且全程不會有
-任何錯誤訊息。
 
 ---
 
@@ -441,7 +433,7 @@ agent 都在對著凍結的檔案訓練。見
 
 **檔名就是參數值。** `config/__init__.py` 在 import 時走過這三個目錄，凡是有匯出一個叫
 `config` 的 dict 的檔案，就把「檔名去掉 `_config`」註冊成一個可用的 key。沒有任何名單
-需要同步維護。把 `config/env/mytopo_config.py` 丟進目錄，`--env mytopo` 就能用。把檔案
+需要同步維護。把 `config/env/mytopo_config.py` 放進目錄，`--env mytopo` 就能用。把檔案
 刪掉，那個 key 就消失。`main.py` 接著把三個 dict 合併成一個交給 `run_drl.py`。
 
 所以可用的 key 就等於目錄裡實際有哪些檔案。
@@ -516,7 +508,7 @@ per-chunk backward 正是為了這個（一次做完的完整圖有 512 次前�
 這種取決於機器的值不該寫死在版控裡 —— 8 GB 的卡該是 2，32 GB 的該更大。
 
 **所以 C 該跟著卡的記憶體調。** 用 `nvidia-smi` 看跑起來之後的用量，還有大量餘裕就往上
-加一階再量。記憶體不夠會直接 OOM 中斷，不會安靜地壞掉。
+加一階再量。記憶體不夠會直接 OOM 中斷，不會無聲地產生錯誤結果。
 
 ## 6. results 目錄佈局
 
@@ -585,7 +577,7 @@ paper/figures/algo/                 演算法虛擬碼渲染
 
 那支腳本從 `results/*/runs/*/train/` 底下的 `output_*.txt` 重建 `train_curves.csv` 跟
 `components.csv`。那些 txt 才是每次訓練的**原始紀錄**。CSV 掉了或是新增了 run 就重跑
-一次，對應關係寫在腳本裡的 `RUN_MAP`。`paper/` 底下沒有任何東西需要網路。
+一次，對應關係寫在腳本裡的 `RUN_MAP`。`paper/` 底下的程式都不需要網路。
 
 ---
 
@@ -601,7 +593,7 @@ paper/figures/algo/                 演算法虛擬碼渲染
 | `sim_test/` | 同樣的估算 | 雙向加總 |
 
 **要讀 directed 那兩個。** undirected 的聚合會把一條 link 雙向的容量加總，於是一條單向
-塞爆、反向閒置的 link 平均起來會看起來很正常。論文從頭到尾讀的都是
+飽和、反向閒置的 link 平均後會呈現正常的數值。論文從頭到尾讀的都是
 `real_directed_test/<tm_id>_eval_metrics.csv`，`paper/figures/` 底下每一支腳本裡都寫著
 這條路徑。
 
@@ -641,12 +633,12 @@ dataset/extend_k_paths.py        建立 K=30 候選檔，同時保留凍結的 K
 
 ## 11. 完全移除
 
-順序是從**只屬於你的**東西排到**大家共用的**。前三步在共用機器上都安全，第四步不是。
+順序是從 **conda 環境**排到**系統套件**。前三步在共用機器上都安全，第四步不是。
 
-對照 §2.1 那張表：Ryu 與它的 patch 在 conda env 裡面，砍 env 就跟著走。Mininet 與
+對照 §2.1 那張表：Ryu 與它的 patch 在 conda env 裡面，移除 env 就一併移除。Mininet 與
 Open vSwitch 是系統層級的，這台機器上的其他人也在用同一份。
 
-### 11.1 先確認實驗資料還在別的地方
+### 11.1 確認實驗資料已備份
 
 `results/*/runs/` 底下是每一次 run 的完整歸檔——訓練 log、測試 session、checkpoint。
 它有進 git，但**只有推上去的部分才在別的地方**。
@@ -657,7 +649,7 @@ cd ~/stride && git status --short && git log --oneline origin/main..HEAD
 
 兩個都沒有輸出才往下走。有輸出就是還有東西只存在這台機器上。
 
-### 11.2 停掉還在跑的東西
+### 11.2 停止執行中的行程
 
 ```bash
 sudo mn -c                                  # 清掉殘留的 namespace 與 bridge
@@ -665,8 +657,8 @@ sudo killall -q iperf3 ryu-manager
 tmux ls; sudo tmux ls                       # 兩邊都要看，controller 可能在 root 的 session
 ```
 
-`sudo tmux ls` 要另外看，是因為不在 tmux 裡啟動時，controller 與 agent 會被丟進一個屬於
-root 的 detached session，socket 跟你的分開。確認要砍哪些之後再用
+`sudo tmux ls` 要另外看，是因為不在 tmux 裡啟動時，controller 與 agent 會被放進一個屬於
+root 的 detached session，socket 跟你的分開。確認要移除哪些之後再用
 `tmux kill-session -t <名稱>`，不要用 `kill-server`，那會連你其他的 session 一起帶走。
 
 ### 11.3 repo 與 conda 環境

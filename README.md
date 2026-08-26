@@ -43,8 +43,7 @@ distributions; **not** available under WSL2 or minimal cloud kernels).
 A real run has a hard per-step budget: the agent must observe, decide and update
 inside one monitoring period (10 s), or it falls behind the traffic it is
 supposed to be routing. On an RTX 3060 Ti, one routing decision takes ~22 ms and a
-32-node step ~4.2 s end to end. Do not assume a CPU-only machine fits in the
-budget — verify it before trusting a curve produced on one.
+32-node step ~4.2 s end to end. Whether a CPU-only machine fits in the budget has to be measured, not assumed.
 
 ---
 
@@ -106,7 +105,7 @@ sudo mn --test pingall
 `install.sh -a` installs Open vSwitch too. Then do
 §2.2's `.pth` step so the conda env can see it.
 
-#### Where all of this ends up
+#### Where the installed files land
 
 Worth knowing on a shared machine:
 
@@ -274,9 +273,10 @@ The order.
 5. `main` tears down Mininet and `ryu-manager` and chowns `results/` back to you
 
 **The three panes fail independently, and all three need watching.** None of them
-reports on the others. If the controller dies, `main` and `drl` print nothing and
-carry on. If the agent dies, `main` keeps driving traffic and waits for a
-`.drl_done` that will never arrive. A quiet pane is not evidence of a live one.
+reports on the state of the other two. If the controller stops, `main` and `drl`
+print nothing and continue. If the agent stops, `main` keeps driving traffic and
+waits for a `.drl_done` that will not arrive. A pane producing no output is not
+evidence that the process is still running.
 
 ### Layout
 
@@ -439,15 +439,13 @@ sudo is asked for once at the start and refreshed in the background, so an
 eight-hour run does not halt at a password prompt hours after you left. Run it
 inside tmux; the controller and the agent open windows beside it.
 
-Three things say whether what came back is usable:
+Read `measurement.txt` first. It decides whether the run is usable.
 
 ```bash
 cat results/<alg>/runs/<run>/train/measurement.txt   # stale_seconds should be single digits
-ls  results/<alg>/runs/<run>/test/<session>/real/    # five traffic matrices, 154 files each
-ls  results/_terminal_logs/                          # controller and agent output, kept on disk
 ```
 
-`measurement.txt` is the one that matters. A run whose controller stopped
+A run whose controller stopped
 measuring partway still produces a full step count, a saved checkpoint and a
 reward curve that keeps moving, because the reward follows the action rather
 than the network -- `stale_seconds` is how long before the end the last
@@ -466,16 +464,10 @@ then checks the result:
 
 1. kills a stuck `main.py` / `run_drl.py` **first**, before the daemons
 2. `pkill -f ryu-manager`, iperf3, `mn -c`
-3. verifies ports 6633/6653 were released, and aborts loudly if not
+3. verifies ports 6633/6653 were released, and aborts if not
 4. chowns `results/` back (a sudo run leaves it root-owned) and removes
    the `.drl_done` sentinel
 
-Doing it by hand with `killall` + `mn -c` misses steps 1 and 3, and those are the
-ones that matter. Ryu runs under the process name `python`, so `killall
-ryu-manager` never matches it, and neither does anything stuck in `net.stop()`.
-A survivor keeps holding the controller port, and the *next* run then connects to
-a stale frozen controller and produces a plausible-looking training curve that is
-actually garbage — with no error anywhere.
 
 ---
 
@@ -579,8 +571,8 @@ mechanism as `STRIDE_VARIANT`. A value that depends on the machine does not
 belong in a tracked default -- 2 suits 8 GB, a 32 GB card wants more.
 
 **So C should follow the card.** Watch `nvidia-smi` once a run is going, and if
-there is plenty of headroom, raise C one step and measure again. Too high fails
-loudly with an OOM rather than quietly.
+there is plenty of headroom, raise C one step and measure again. Too high fails with an OOM rather than producing
+wrong results silently.
 
 ## 6. Results layout
 
@@ -736,14 +728,14 @@ dataset/extend_k_paths.py        build a K=30 candidate file while preserving th
 
 ## 11. Complete removal
 
-The order runs from **what is only yours** to **what the machine shares**. The
+The order runs from the **conda environment** to the **system packages**. The
 first three steps are safe on a shared machine. The fourth is not.
 
 Against the table in §2.1: Ryu and its patch live inside the conda environment,
 so removing the environment takes them with it. Mininet and Open vSwitch are
 system-level, and everyone else on the machine uses the same copy.
 
-### 11.1 Confirm the experiment data exists somewhere else
+### 11.1 Confirm the experiment data is backed up
 
 `results/*/runs/` holds the complete archive of every run — training logs, test
 sessions, checkpoints. It is tracked in git, but **only what has been pushed
@@ -756,7 +748,7 @@ cd ~/stride && git status --short && git log --oneline origin/main..HEAD
 Continue only if both print nothing. Any output means something still exists
 only on this machine.
 
-### 11.2 Stop what is still running
+### 11.2 Stop the running processes
 
 ```bash
 sudo mn -c                                  # clear leftover namespaces and bridges

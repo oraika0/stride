@@ -91,7 +91,7 @@ echo /usr/local/lib/python3.8/dist-packages > "$CONDA_PREFIX/lib/python3.8/site-
 ## 5. Ryu 與延遲 patch
 
 **要從 git 裝，不能用 `pip install ryu`。** PyPI 上最後一版
-（4.34，2020 年）早於 eventlet 0.30.3 的破壞性變更，裝完 `import ryu` 會死在
+（4.34，2020 年）早於 eventlet 0.30.3 的破壞性變更，裝完 `import ryu` 會中止於
 `ALREADY_HANDLED`。上游 master 有修，但之後再也沒發布過。
 
 ```bash
@@ -111,10 +111,10 @@ pip 另外抓的最新版。
 而且沒指定版本，而 `setup_requires` 是 **setuptools 自己的機制、不是 pip 的** —— 它會在
 建置當下把最新的 pbr 抓進 `src/ryu/.eggs/`，`--no-build-isolation` 管不到那裡。新版 pbr 會
 `from setuptools.extern.tomli import load`，而 setuptools 要到 61 才開始 vendor `tomli`，
-於是建置死在 `ModuleNotFoundError: No module named 'setuptools.extern.tomli'`。事先把 pbr
+於是建置中止於 `ModuleNotFoundError: No module named 'setuptools.extern.tomli'`。事先把 pbr
 裝好，需求就已經滿足，不會再去抓。
 
-如果你在加這個 pin 之前已經撞到那個錯，重試前要先砍掉 `src/ryu/.eggs` —— 不然它會直接用
+如果你在加這個 pin 之前已經撞到那個錯，重試前要先刪掉 `src/ryu/.eggs` —— 不然它會直接用
 已經抓下來的那份。
 
 延遲 patch 是每條 link 的延遲量得到的前提，**少了它延遲全部讀 0，而且不會有任何錯誤**。
@@ -154,7 +154,7 @@ STRIDE_CHUNK=4 ./scripts/run_chain.sh                   # 帶覆寫
 ```
 
 **它自己找得到 checkpoint。** run 目錄名字含時間戳，事前無從得知，所以腳本記下訓練前
-`runs/` 有哪些、訓練後比差集 —— 用「最新的那個」會在別的東西碰過舊目錄時安靜地測錯，
+`runs/` 有哪些、訓練後比差集 —— 用「最新的那個」會在其他程序碰過舊目錄時測到錯的 checkpoint，
 而測錯的結果看起來跟測對的一模一樣。新增不是剛好一個就中止，不猜。
 
 開頭問一次 sudo 密碼，之後背景每分鐘 refresh，八小時的訓練不會在你離開之後停在密碼提示。
@@ -180,7 +180,7 @@ tmux new-window -n main "sudo -E $PY main.py --env 32node_144tm_directed --alg s
 session 的新視窗**，而不是另外建一個 root 的。所以三個都用一般的 `tmux attach` 就看得到，
 不需要 `sudo tmux`。
 
-**不在 tmux 裡跑的話**，主行程留在原地，controller 與 drl 會被丟進一個 detached 的
+**不在 tmux 裡跑的話**，主行程留在原地，controller 與 drl 會被放進一個 detached 的
 **root** session —— 那個要 `sudo tmux attach -t stride` 才看得到，因為它屬於 root，
 socket 跟你的分開（`/tmp/tmux-0/` 對 `/tmp/tmux-1000/`）。
 
@@ -230,7 +230,7 @@ sudo -E "$PY" main.py --env 32node_144tm_directed --alg ls2ic_dd train
 ```
 
 `STRIDE_VARIANT` 必須是環境變數，而且要寫成明確的 `VAR=value` 指派 —— 光靠 `sudo -E`
-會把它弄丟，掉了就**安靜地訓練預設架構**。`--seed` 是一般參數，不會掉。
+會把它弄丟，未傳入時會**在不報錯的情況下訓練預設架構**。`--seed` 是一般參數，不會掉。
 
 ## 9. 每次跑完收尾
 
@@ -308,7 +308,7 @@ dataset/     拓樸、traffic matrix、凍結的候選路徑 —— 輸入，不
 results/     所有 run 的產出。runs/<name>/{train,test} 是歸檔，
              results/<alg>/ 底下其餘是 controller 與 agent 交換檔案的即時區
 paper/       圖表產生器 —— 見 paper/README.md
-docs/        方法論筆記，含走過的死路與失敗原因
+docs/        方法論筆記，含已排除的方向與失敗原因
 ```
 
 run 的目錄名就是重現它的指令：`base_32node_s17_...` 等於 `STRIDE_VARIANT=base`、
@@ -337,8 +337,8 @@ sudo killall -q iperf3 ryu-manager
 tmux ls; sudo tmux ls        # 兩邊都看，controller 可能在 root 的 session
 ```
 
-確認要砍哪些之後用 `tmux kill-session -t <名稱>`，不要 `kill-server`，那會連你其他的
-session 一起帶走。然後砍 repo 與 conda 環境。
+確認要移除哪些之後用 `tmux kill-session -t <名稱>`，不要 `kill-server`，那會連你其他的
+session 一起帶走。然後移除 repo 與 conda 環境。
 
 ```bash
 rm -rf ~/stride              # 含 src/ 底下的 Mininet 原始碼樹
