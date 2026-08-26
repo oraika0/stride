@@ -47,7 +47,7 @@ $s_{t-1}$ 並非取不到。多存一個 state，就能讓分子分母都條件�
 效應**，真正的 demand（TM）是 latent 的。GRU encoder 把觀測歷史聚合成對 latent demand 的
 belief（$h^{\text{pair}}$），policy 實際作用在這個 belief 上，不是 raw link state。
 
-短窗內 demand 視為同一個 epoch、近似常數。$s_{t-1}$ 與 $s_t$ 因此只是**同一個 demand 的
+短時間內 demand 視為同一個 epoch、近似常數。$s_{t-1}$ 與 $s_t$ 因此只是**同一個 demand 的
 兩次下游觀測**，差別在量測時點。經 GRU 聚合後兩者反映同一個 demand，在 belief 空間相似。
 於是
 
