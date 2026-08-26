@@ -92,11 +92,19 @@ python -c "from mininet.net import Mininet; from mininet.link import TCLink; \
 
 ```bash
 git clone https://github.com/mininet/mininet src/mininet
-cd src/mininet/util && ./install.sh -a
+SRC="$PWD/src"
+(cd src/mininet/util && ./install.sh -s "$SRC" -nv)
 sudo mn --test pingall
 ```
 
-`install.sh -a` 會一併裝 Open vSwitch。裝完再做 §2.2 的 `.pth`。
+`-n` 裝 Mininet 的依賴與本體，`-v` 裝 Open vSwitch，兩個就夠。**不要用預設的 `-a`** ——
+那會連 POX、oflops、OpenFlow 參考實作一起裝，這個 repo 一個都用不到。
+
+`-s` 指定依賴的原始碼樹放哪，這裡讓它們一起進 `src/`，而不是散落在 `$HOME`。它**必須寫
+在 `-nv` 前面**。那對括號是刻意的，它讓 `cd` 只在子 shell 裡生效，跑完你還在 repo 根目錄。
+`src/` 已經在 `.gitignore` 裡。
+
+裝完再做 §2.2 的 `.pth`。
 
 ### 2.2 Python 環境
 
@@ -676,7 +684,7 @@ sudo rm -rf /usr/local/lib/python3.8/dist-packages/mininet \
 sudo rm -f  /usr/local/bin/mn /usr/bin/mnexec
 ```
 
-原始碼路線的 Open vSwitch **也是 apt 裝的**（`install.sh -a` 內部就是呼叫 apt），
+原始碼路線的 Open vSwitch **也是 apt 裝的**（`install.sh` 的 `-v` 內部就是呼叫 apt），
 所以 OVS 的部分跟上面那段一樣，用 purge。
 
 ### 11.5 Open vSwitch 的殘留狀態

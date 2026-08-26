@@ -126,12 +126,22 @@ visible to conda. The second command is the check — it must print `ok`.
 
 ```bash
 git clone https://github.com/mininet/mininet src/mininet
-cd src/mininet/util && ./install.sh -a
+SRC="$PWD/src"
+(cd src/mininet/util && ./install.sh -s "$SRC" -nv)
 sudo mn --test pingall
 ```
 
-`install.sh -a` installs Open vSwitch too. Then do
-§2.2's `.pth` step so the conda env can see it.
+`-n` installs Mininet's dependencies and core files, `-v` installs Open vSwitch,
+and those two are all that is needed. **Not the default `-a`**, which also brings
+POX, oflops and the OpenFlow reference implementation, none of which this
+repository uses.
+
+`-s` says where dependency source trees go — here into `src/` rather than
+scattered around `$HOME` — and it **has to come before `-nv`**. The parentheses
+are deliberate: they keep the `cd` inside a subshell, so you end up back at the
+repository root. `src/` is already in `.gitignore`.
+
+Then do §2.2's `.pth` step so the conda environment can see it.
 
 ### 2.2 Python environment
 
@@ -817,7 +827,7 @@ sudo rm -rf /usr/local/lib/python3.8/dist-packages/mininet \
 sudo rm -f  /usr/local/bin/mn /usr/bin/mnexec
 ```
 
-The source route installs Open vSwitch **through apt as well** (`install.sh -a`
+The source route installs Open vSwitch **through apt as well** (`install.sh -v`
 calls apt internally), so purge it exactly as above.
 
 ### 11.5 Open vSwitch leftover state
