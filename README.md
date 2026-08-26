@@ -2,19 +2,18 @@
 
 > 中文版說明見 [README.zh-TW.md](README.zh-TW.md)。
 >
-> In a hurry? [`QUICKSTART.md`](QUICKSTART.md) is the same workflow as commands
-> with one line of explanation each.
+> In a hurry? [`QUICKSTART.md`](QUICKSTART.md) is the same workflow as commands,
+> briefly explained.
 
-STRIDE selects, for every origin–destination (OD) pair, one path out of a frozen
+STRIDE selects, for every origin–destination (OD) pair, one path out of a fixed
 set of K=20 candidates. All pairs are decided **jointly and non-autoregressively**
 by a discrete-diffusion decoder that starts from a fully masked configuration and
-refines it over M denoise steps. The policy is trained with actor–critic RL against
-either a fluid-queue simulator or a real Mininet + Ryu testbed.
+refines it over M denoise steps. The policy is trained with actor–critic RL on a
+real Mininet + Ryu testbed.
 
 The repository also contains the baselines the paper compares against (LS2IC,
-MADQN/PS-DQN, DRSIR, OSPF, widest-path, adaptive Dijkstra, mean-field, and a static
-ILP oracle), the evaluation pipeline, and the scripts that generate every figure and
-table in the paper.
+MADQN/PS-DQN, DRSIR, OSPF, and a static ILP oracle), the evaluation pipeline, and
+the scripts that generate every figure and table in the paper.
 
 ---
 
@@ -37,13 +36,20 @@ at system level. Ryu is installed into the conda environment and **requires a
 manual patch** (§2.3).
 
 Real Mininet experiments additionally need `sudo`, and a kernel providing the
-`openvswitch`, `veth` and `sch_netem` modules (standard on desktop Linux
-distributions; **not** available under WSL2 or minimal cloud kernels).
+`openvswitch`, `veth` and `sch_netem` modules. Desktop Linux distributions have
+them. Virtualised or trimmed kernels (WSL, some cloud images, some container
+environments) may not, so check before installing.
+
+```bash
+lsmod   | grep -E 'openvswitch|veth|sch_netem'   # already loaded
+modinfo openvswitch veth sch_netem               # available to load
+```
 
 A real run has a hard per-step budget: the agent must observe, decide and update
 inside one monitoring period (10 s), or it falls behind the traffic it is
 supposed to be routing. On an RTX 3060 Ti, one routing decision takes ~22 ms and a
-32-node step ~4.2 s end to end. Whether a CPU-only machine fits in the budget has to be measured, not assumed.
+32-node step ~4.2 s end to end. On a different machine, run a training session and
+watch the update time the `drl` pane prints to see whether it fits.
 
 ---
 
@@ -63,20 +69,30 @@ mn --version                              # 2.3.0
 sudo mn --test pingall                    # verify
 ```
 
-`universe` is Ubuntu's community repository, where Mininet lives, and it is not
-always enabled by default. The second line installs Mininet and Open vSwitch
-themselves. The third starts the Open vSwitch daemon and sets it to start at
-boot — without it running, Mininet cannot create switches.
+`universe` is not an external source. It is one of the four components of the
+official Ubuntu archive (`main`, `restricted`, `universe`, `multiverse`) and holds
+community-maintained packages, Mininet among them. Desktop installations enable it
+by default, some server and cloud images do not, and `apt install mininet` then
+reports the package as missing. This line switches that component on.
 
-Do **not** run Mininet's `install.sh` here: it fails on pep8/pycodestyle and then
-on PEP 668, and every workaround is worse than the packages. 2.3.0 is enough —
-this repository only calls `Mininet(controller=RemoteController, link=TCLink)`
-and `addLink(bw=, max_queue_size=)`.
+`systemctl` is systemd's control command, systemd being what Ubuntu now uses to
+manage background services. `enable` sets the service to start at boot, `--now`
+starts it immediately as well. Without the Open vSwitch daemon running, Mininet
+cannot create switches.
 
-apt installs Mininet for the **system** Python, 3.12 on 24.04, while the conda
-env in §2.2 is on 3.8, so §2.2's `.pth` recipe points at the wrong directory.
-Link the package in directly instead — this also exposes Mininet without exposing
-everything else installed for 3.12:
+These packages cover both Mininet and Open vSwitch, so Mininet's own `install.sh`
+is **not** needed here.
+
+**Why there is a further step.** Mininet installs only into the system Python,
+never into a conda environment, while this repository's main process runs under
+the **conda** Python (§4) and needs to `import mininet`. So the conda interpreter
+has to be able to find the system copy. This is not moving Mininet into conda —
+the `mn` command still runs under the system Python. Only the import search path
+is at stake.
+
+apt installs Mininet for the system Python, 3.12 on 24.04, while the conda
+environment is on 3.8. The directories differ, so §2.2's `.pth` recipe would point
+at the wrong one. Create a link instead.
 
 ```bash
 conda activate stride
@@ -86,10 +102,14 @@ python -c "from mininet.net import Mininet; from mininet.link import TCLink; \
            from mininet.node import RemoteController; print('ok')"
 ```
 
-`ln -sfn` puts a symlink to the system Mininet inside the conda environment's
-site-packages so the conda interpreter can find it. Only Mininet is linked in,
-not everything else installed for 3.12. The second command is the check — it must
-print `ok`.
+`ln` creates links. `-s` makes a symbolic link (a pointer to another path), `-f`
+overwrites an existing target, and `-n` replaces a target that is itself a link to
+a directory rather than descending into it. So the line places a link named
+`mininet` in the conda environment's `site-packages/` pointing at the system copy,
+and `import mininet` under the conda Python then resolves to the real files.
+
+Only this one package is linked in. Nothing else installed for 3.12 becomes
+visible to conda. The second command is the check — it must print `ok`.
 
 **On this route, skip §2.2's `.pth` step.** Everything else is the same.
 
@@ -450,7 +470,7 @@ measuring partway still produces a full step count, a saved checkpoint and a
 reward curve that keeps moving, because the reward follows the action rather
 than the network -- `stale_seconds` is how long before the end the last
 measurement landed, and anything past a monitoring period means the agent spent
-that time training against a frozen file. See
+that time training against a file that stopped updating. See
 [`docs/controller_stops_measuring.md`](docs/controller_stops_measuring.md).
 
 ### Shutdown
@@ -676,7 +696,7 @@ inside that band; reaching 1.0 means it is worse than plain shortest path.
 paper/bounds/check_min_mlu.py         per-TM theoretical minimum MLU (LP relaxation or single-path ILP)
 paper/bounds/edge_lp_bound.py         edge-based multicommodity LP lower bound (no candidate-set restriction)
 paper/bounds/k_oracle_curve.py        optimal MLU as a function of candidate-set size K
-dataset/extend_k_paths.py        build a K=30 candidate file while preserving the frozen K=20 prefix
+dataset/extend_k_paths.py        build a K=30 candidate file while preserving the fixed K=20 prefix
 ```
 
 ---

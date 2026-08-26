@@ -3,15 +3,14 @@
 > 中文版說明。英文版見 [README.md](README.md)，兩份內容一致。
 >
 > 只想快點跑起來：[`QUICKSTART.zh-TW.md`](QUICKSTART.zh-TW.md) 是同一套流程，以指令為
-> 主軸，每步一兩句話說明。
+> 主軸，每步簡短說明。
 
-STRIDE 為每一組來源-目的對（OD pair）從**凍結的 K=20 條候選路徑**中挑一條。所有 pair
+STRIDE 為每一組來源-目的對（OD pair）從**固定的 K=20 條候選路徑**中挑一條。所有 pair
 由一個離散擴散解碼器**平行且非自迴歸地共同決定**，從全遮罩狀態開始，經過 M 個去噪步逐
-步填入並修正。策略以 actor–critic 強化學習在真實 Mininet + Ryu 測試床上訓練。
+步填入並修正。策略以 actor–critic 強化學習在真實 Mininet + Ryu 測試平台上訓練。
 
-repo 同時包含論文比較用的所有 baseline（LS2IC、MADQN/PS-DQN、DRSIR、OSPF、widest-path、
-adaptive Dijkstra、mean-field，以及靜態 ILP oracle）、評估流程，還有產生論文每一張圖跟
-每一張表的腳本。
+repo 同時包含論文比較用的 baseline（LS2IC、MADQN/PS-DQN、DRSIR、OSPF，以及靜態 ILP
+oracle）、評估流程，還有產生論文每一張圖跟每一張表的腳本。
 
 ---
 
@@ -33,11 +32,15 @@ Python 與 PyTorch 在 conda 環境裡（§2.2），Mininet 與 Open vSwitch 在
 conda 環境裡，而且**需要手動 patch**（§2.3）。
 
 真實 Mininet 實驗另外需要 `sudo`，以及 kernel 提供 `openvswitch`、`veth`、`sch_netem`
-三個模組。一般桌面 Linux 發行版都有，**WSL2 跟精簡版 cloud kernel 沒有**。
+三個模組。一般桌面 Linux 發行版都有。虛擬化或精簡過的 kernel（WSL、部分 cloud image、
+部分容器環境）不一定有，裝之前先確認。
 
-真實環境每一步有硬性的時間預算。agent 必須在一個 monitoring period（10 秒）之內完成觀
-測、決策與更新，否則就落後於它正在調度的流量。在 RTX 3060 Ti 上，一次路由決策約 22 ms，
-32-node 一整步約 4.2 秒。純 CPU 的機器是否符合這個預算需要先實測，不應直接假設。
+```bash
+lsmod | grep -E 'openvswitch|veth|sch_netem'    # 已經載入的
+modinfo openvswitch veth sch_netem              # 有沒有這個模組可以載
+```
+
+真實環境每一步有硬性的時間預算。agent 必須在一個 monitoring period（10 秒）之內完成觀測、決策與更新，否則就落後於它正在調度的流量。在 RTX 3060 Ti 上，一次路由決策約 22 ms，32-node 一整步約 4.2 秒。換一台機器要實際測一次訓練，並看 `drl` pane 印出的 update time 有沒有落在預算內。
 
 ---
 
@@ -57,17 +60,15 @@ mn --version                              # 2.3.0
 sudo mn --test pingall                    # 驗證
 ```
 
-`universe` 是 Ubuntu 的社群套件庫，Mininet 在裡面，預設不一定啟用。第二行裝 Mininet 與
-Open vSwitch 本體。第三行讓 Open vSwitch 的 daemon 立刻啟動、並設成開機自動啟動 ——
-沒有它在跑，Mininet 建不出 switch。
+`universe` 不是外部來源，它是 Ubuntu 官方套件庫的四個分區之一（`main`、`restricted`、`universe`、`multiverse`），放的是社群維護的套件，Mininet 就在裡面。桌面版預設會啟用這個分區，部分 server 與 cloud image 不會，那時 `apt install mininet` 會回報找不到套件。這一行就是把那個分區打開，讓 apt 看得到裡面的東西。
 
-**不要**在這裡跑 Mininet 的 `install.sh`：它會先因 pep8/pycodestyle 失敗，再因 PEP 668 失敗，
-而每一種繞法都比直接用套件更糟。2.3.0 就夠了 —— 這個 repo 只用到
-`Mininet(controller=RemoteController, link=TCLink)` 跟 `addLink(bw=, max_queue_size=)`。
+`systemctl` 是 systemd 的管理指令，systemd 是 Ubuntu 現在用來管背景服務的元件。`enable` 設定開機自動啟動，`--now` 是順便立刻啟動一次。Open vSwitch 的 daemon 沒有在跑，Mininet 就建不出 switch。
 
-apt 把 Mininet 裝給**系統** Python（24.04 是 3.12），而 §2.2 的 conda 環境是 3.8，
-所以 §2.2 的 `.pth` 寫法會指到錯的目錄。改成直接把套件連進來 —— 這樣也只暴露 Mininet
-一個，不會把系統為 3.12 裝的所有東西一起攤開：
+apt 這一條已經把 Mininet 與 Open vSwitch 都裝好了，**不需要**再跑 Mininet 的 `install.sh`。
+
+**為什麼還要多這一步。** Mininet 只能裝在系統的 Python 上，裝不進 conda 環境。而這個 repo 的主程式是用 **conda 的 Python** 執行的（見 §4），它需要 `import mininet`。所以要讓 conda 的直譯器找得到系統那一份套件。注意不是「把 Mininet 搬到 conda 上跑」——`mn` 這個指令本身仍然是系統 Python 在跑，這裡處理的只有 import 的搜尋路徑。
+
+apt 是把 Mininet 裝給系統 Python（24.04 上是 3.12），而 conda 環境是 3.8，兩邊目錄不同，所以 §2.2 那個 `.pth` 寫法會指到錯的地方。改成建一個捷徑。
 
 ```bash
 conda activate stride
@@ -77,9 +78,9 @@ python -c "from mininet.net import Mininet; from mininet.link import TCLink; \
            from mininet.node import RemoteController; print('ok')"
 ```
 
-`ln -sfn` 在 conda 環境的 site-packages 裡建一個指向系統 Mininet 的 symlink，讓 conda
-的 python 找得到它。只接進 Mininet 這一個套件，不會把系統為 3.12 裝的其他東西一起攤開。
-第二個指令是驗證，印出 `ok` 才算成功。
+`ln` 是建連結的指令，`-s` 建 symbolic link（捷徑，指向另一個路徑），`-f` 是目標已經存在就覆蓋掉，`-n` 是目標本身若為指向目錄的捷徑就直接換掉它、而不是鑽進去建在裡面。所以這一行的意思是「在 conda 的 `site-packages/` 裡放一個叫 `mininet` 的捷徑，指到系統那份」，之後 conda 的 Python `import mininet` 就會走到系統的實體檔案。
+
+只接這一個套件，系統為 3.12 裝的其他東西不會被 conda 看到。第二個指令是驗證，印出 `ok` 才算成功。
 
 **走這條路線的話，§2.2 的 `.pth` 那一步跳過**，其餘完全一樣。
 
@@ -398,7 +399,7 @@ cat results/<alg>/runs/<run>/train/measurement.txt   # stale_seconds 應為個�
 controller 中途停止量測的 run 一樣會跑完全部步數、存下
 checkpoint、畫出持續變動的 reward 曲線 —— 因為 reward 跟著 action 走，不是跟著網路走。
 `stale_seconds` 是訓練結束前多久最後一次量測落地，超過一個監控週期就代表那段時間
-agent 都在對著凍結的檔案訓練。見
+agent 都在對著不再更新的檔案訓練。見
 [`docs/controller_stops_measuring.md`](docs/controller_stops_measuring.md)。
 
 ### 收尾清理
@@ -587,7 +588,7 @@ Geant 在 `tm_scale=3` 且為 directed 時的參考點。ILP 約 0.67，LP 約 0
 paper/bounds/check_min_mlu.py         每個 TM 的理論最小 MLU（LP 鬆弛或單路徑 ILP）
 paper/bounds/edge_lp_bound.py         edge-based 多商品流 LP 下界，不限制候選集
 paper/bounds/k_oracle_curve.py        最佳 MLU 隨候選集大小 K 的變化曲線
-dataset/extend_k_paths.py        建立 K=30 候選檔，同時保留凍結的 K=20 前綴
+dataset/extend_k_paths.py        建立 K=30 候選檔，同時保留固定的 K=20 前綴
 ```
 
 ---
