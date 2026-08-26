@@ -92,8 +92,7 @@ python -c "from mininet.net import Mininet; from mininet.link import TCLink; \
 
 ```bash
 git clone https://github.com/mininet/mininet src/mininet
-cd src/mininet && git checkout -b 2.3.1b1
-cd util && ./install.sh -a
+cd src/mininet/util && ./install.sh -a
 sudo mn --test pingall
 ```
 
