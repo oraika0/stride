@@ -70,23 +70,7 @@ sudo mn --test pingall                    # 驗證
 
 apt 這一條已經把 Mininet 與 Open vSwitch 都裝好了，**不需要**再跑 Mininet 的 `install.sh`。
 
-**為什麼還要多這一步。** Mininet 只能裝在系統的 Python 上，裝不進 conda 環境。而這個 repo 的主程式是用 **conda 的 Python** 執行的（見 §4），它需要 `import mininet`。所以要讓 conda 的直譯器找得到系統那一份套件。注意不是「把 Mininet 搬到 conda 上跑」——`mn` 這個指令本身仍然是系統 Python 在跑，這裡處理的只有 import 的搜尋路徑。
-
-apt 是把 Mininet 裝給系統 Python（24.04 上是 3.12），而 conda 環境是 3.8，兩邊目錄不同，所以 §2.2 那個 `.pth` 寫法會指到錯的地方。改成建一個捷徑。
-
-```bash
-conda activate stride
-ln -sfn /usr/lib/python3/dist-packages/mininet \
-      "$CONDA_PREFIX/lib/python3.8/site-packages/mininet"
-python -c "from mininet.net import Mininet; from mininet.link import TCLink; \
-           from mininet.node import RemoteController; print('ok')"
-```
-
-`ln` 是建連結的指令，`-s` 建 symbolic link（捷徑，指向另一個路徑），`-f` 是目標已經存在就覆蓋掉，`-n` 是目標本身若為指向目錄的捷徑就直接換掉它、而不是鑽進去建在裡面。所以這一行的意思是「在 conda 的 `site-packages/` 裡放一個叫 `mininet` 的捷徑，指到系統那份」，之後 conda 的 Python `import mininet` 就會走到系統的實體檔案。
-
-只接這一個套件，系統為 3.12 裝的其他東西不會被 conda 看到。第二個指令是驗證，印出 `ok` 才算成功。
-
-**走這條路線的話，§2.2 的 `.pth` 那一步跳過**，其餘完全一樣。
+裝完接著做 §2.2，那裡會把它接進 conda 環境。
 
 #### Ubuntu 20.04 —— 從原始碼
 
@@ -104,7 +88,7 @@ sudo mn --test pingall
 在 `-nv` 前面**。那對括號是刻意的，它讓 `cd` 只在子 shell 裡生效，跑完你還在 repo 根目錄。
 `src/` 已經在 `.gitignore` 裡。
 
-裝完再做 §2.2 的 `.pth`。
+裝完接著做 §2.2，那裡會把它接進 conda 環境。
 
 ### 2.2 Python 環境
 
@@ -123,24 +107,28 @@ pip install -r requirements.txt
 | 誰 | 用哪個 Python | 怎麼找到 Mininet |
 | --- | --- | --- |
 | `mn`、`sudo mn -c` 這些命令列工具 | 系統的 `/usr/bin/python3` | 本來就在它的搜尋路徑裡，不用處理 |
-| 這個 repo 的 `main.py` | **conda 的** `envs/stride/bin/python` | 要靠 `.pth` 或 symlink 接過去 |
+| 這個 repo 的 `main.py` | **conda 的** `envs/stride/bin/python` | 要靠一個 symlink 接過去 |
 | Ryu controller | conda 的 python | 不需要，它不 import mininet |
 
 `main.py` 會 `from mininet.net import Mininet` 自己把拓樸建起來，而它是用 conda 的直譯器執行的（見 §4），所以缺了這個橋接就會中止在那一行。
 
-**把 Mininet 橋接進 conda 環境，只有原始碼安裝需要，做一次就好。** apt 路線在 §2.1 用 symlink 做過了，直接跳到 §2.3。
+**把 Mininet 橋接進 conda 環境，做一次就好。** 兩條路線同一個指令，只有來源路徑不同，照你在 §2.1 選的那條挑一行。
 
 ```bash
-echo /usr/local/lib/python3.8/dist-packages \
-  > "$CONDA_PREFIX/lib/python3.8/site-packages/system_dist_packages.pth"
-python -c "import mininet; print(mininet.__file__)"   # 必須成功
+conda activate stride
+S=/usr/lib/python3/dist-packages/mininet            # apt 路線（24.04）
+S=/usr/local/lib/python3.8/dist-packages/mininet    # 原始碼路線（20.04）
+
+ln -sfn "$S" "$CONDA_PREFIX/lib/python3.8/site-packages/mininet"
+python -c "from mininet.net import Mininet; from mininet.link import TCLink; \
+           from mininet.node import RemoteController; print('ok')"
 ```
 
-`.pth` 是一個純文字檔，內容就是一行路徑。Python 每次啟動都會讀 `site-packages/` 底下所有 `.pth`，把裡面的路徑**追加**到 `sys.path` 末端。追加而不是插到前面，所以 conda 自己的 numpy、torch 仍然優先，只有 conda 裡沒有的 Mininet 才會落到系統那一份。
+`ln` 是建連結的指令。`-s` 建 symbolic link（捷徑，指向另一個路徑），`-f` 是目標已經存在就覆蓋掉，`-n` 是目標本身若為指向目錄的捷徑就直接換掉它、而不是鑽進去建在裡面。所以這一行是「在 conda 的 `site-packages/` 裡放一個叫 `mininet` 的捷徑，指到系統那份」，之後 conda 的 Python `import mininet` 就會走到系統的實體檔案。第二個指令是驗證，印出 `ok` 才算成功。
 
-**兩條路線用不同做法的原因。** 原始碼安裝是裝給 3.8，跟 conda 環境同版本，整個目錄接進來沒問題。apt 是裝給 3.12，那個目錄裡還有一堆為 3.12 裝的別的套件，整包接進 3.8 會出事，所以只用 symlink 接 `mininet` 一個。
+`sys.path` 一個字都沒改，只是清單上原本就有的 `site-packages/` 目錄裡多了一個項目。**接進來的只有 `mininet` 這一個套件**，系統目錄裡的其他東西（那裡還有另一份 Ryu 跟 setuptools）不會被 conda 看到。
 
-> **這個檔案在 conda 環境裡面。** `conda env remove -n stride` 之後重建環境，它會跟著環境一起消失，要再跑一次上面那兩行。系統那邊的 Mininet 不受影響，不用重裝。漏掉的話每次 real 實驗都會中止於 `from mininet.net import Mininet`。
+> **這個捷徑在 conda 環境裡面。** `conda env remove -n stride` 之後重建環境，它會跟著環境一起消失，要再跑一次上面那兩行。系統那邊的 Mininet 不受影響，不用重裝。漏掉的話每次 real 實驗都會中止於 `from mininet.net import Mininet`。
 
 ### 2.3 Ryu + 延遲量測 patch
 

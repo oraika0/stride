@@ -84,16 +84,16 @@ pip install -r requirements.txt
 
 ## 4. Let the env see Mininet
 
-apt installed it for the system Python 3.12, and a
-source install put it in the system `dist-packages` — either way the conda
-interpreter cannot see it. Take the line matching the route you took in step 2:
+Mininet installs into the system `dist-packages`, which the conda interpreter
+does not see. Put a link to it inside conda's `site-packages/`. Take the source
+path matching the route you took in step 2:
 
 ```bash
-# 24.04 (apt): link the one package in
-ln -sfn /usr/lib/python3/dist-packages/mininet "$CONDA_PREFIX/lib/python3.8/site-packages/mininet"
+S=/usr/lib/python3/dist-packages/mininet            # 24.04 (apt)
+S=/usr/local/lib/python3.8/dist-packages/mininet    # 20.04 (source)
 
-# 20.04 (source): put the system path on sys.path
-echo /usr/local/lib/python3.8/dist-packages > "$CONDA_PREFIX/lib/python3.8/site-packages/system_dist_packages.pth"
+ln -sfn "$S" "$CONDA_PREFIX/lib/python3.8/site-packages/mininet"
+python -c "import mininet; print('ok')"             # must print ok
 ```
 
 ## 5. Ryu, and the delay patch

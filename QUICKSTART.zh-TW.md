@@ -77,15 +77,15 @@ pip install -r requirements.txt
 
 ## 4. 讓 env 看得到 Mininet
 
-apt 是裝給系統 Python 3.12，原始碼安裝是進系統的
-`dist-packages`，兩種 conda 直譯器都看不到。照你第 2 步選的路線挑一行：
+Mininet 裝在系統的 `dist-packages`，conda 直譯器看不到。在 conda 的 `site-packages/`
+裡建一個捷徑指過去。照你第 2 步選的路線挑來源路徑：
 
 ```bash
-# 24.04 (apt)：把那一個套件連進來
-ln -sfn /usr/lib/python3/dist-packages/mininet "$CONDA_PREFIX/lib/python3.8/site-packages/mininet"
+S=/usr/lib/python3/dist-packages/mininet            # 24.04 (apt)
+S=/usr/local/lib/python3.8/dist-packages/mininet    # 20.04 (原始碼)
 
-# 20.04 (原始碼)：把系統路徑加進 sys.path
-echo /usr/local/lib/python3.8/dist-packages > "$CONDA_PREFIX/lib/python3.8/site-packages/system_dist_packages.pth"
+ln -sfn "$S" "$CONDA_PREFIX/lib/python3.8/site-packages/mininet"
+python -c "import mininet; print('ok')"             # 必須印出 ok
 ```
 
 ## 5. Ryu 與延遲 patch

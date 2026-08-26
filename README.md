@@ -92,35 +92,7 @@ So it is not started on demand — it has to be up beforehand.
 These packages cover both Mininet and Open vSwitch, so Mininet's own `install.sh`
 is **not** needed here.
 
-**Why there is a further step.** Mininet installs only into the system Python,
-never into a conda environment, while this repository's main process runs under
-the **conda** Python (§4) and needs to `import mininet`. So the conda interpreter
-has to be able to find the system copy. This is not moving Mininet into conda —
-the `mn` command still runs under the system Python. Only the import search path
-is at stake.
-
-apt installs Mininet for the system Python, 3.12 on 24.04, while the conda
-environment is on 3.8. The directories differ, so §2.2's `.pth` recipe would point
-at the wrong one. Create a link instead.
-
-```bash
-conda activate stride
-ln -sfn /usr/lib/python3/dist-packages/mininet \
-      "$CONDA_PREFIX/lib/python3.8/site-packages/mininet"
-python -c "from mininet.net import Mininet; from mininet.link import TCLink; \
-           from mininet.node import RemoteController; print('ok')"
-```
-
-`ln` creates links. `-s` makes a symbolic link (a pointer to another path), `-f`
-overwrites an existing target, and `-n` replaces a target that is itself a link to
-a directory rather than descending into it. So the line places a link named
-`mininet` in the conda environment's `site-packages/` pointing at the system copy,
-and `import mininet` under the conda Python then resolves to the real files.
-
-Only this one package is linked in. Nothing else installed for 3.12 becomes
-visible to conda. The second command is the check — it must print `ok`.
-
-**On this route, skip §2.2's `.pth` step.** Everything else is the same.
+Then continue with §2.2, which links it into the conda environment.
 
 #### Ubuntu 20.04 — from source
 
@@ -141,7 +113,7 @@ scattered around `$HOME` — and it **has to come before `-nv`**. The parenthese
 are deliberate: they keep the `cd` inside a subshell, so you end up back at the
 repository root. `src/` is already in `.gitignore`.
 
-Then do §2.2's `.pth` step so the conda environment can see it.
+Then continue with §2.2, which links it into the conda environment.
 
 ### 2.2 Python environment
 
@@ -162,36 +134,43 @@ question is whether the conda interpreter can find that copy.
 | Who | Which Python | How it finds Mininet |
 | --- | --- | --- |
 | `mn`, `sudo mn -c` and the other CLI tools | the system `/usr/bin/python3` | already on its search path, nothing to do |
-| this repository's `main.py` | the **conda** `envs/stride/bin/python` | needs the `.pth` or the symlink |
+| this repository's `main.py` | the **conda** `envs/stride/bin/python` | needs the symlink |
 | the Ryu controller | the conda Python | does not import mininet at all |
 
 `main.py` builds the topology itself with `from mininet.net import Mininet`, and
 it runs under the conda interpreter (§4), so without this bridge it stops on that
 line.
 
-**Bridge Mininet into the conda environment — source installs only, once.** The
-apt route already did this with a symlink in §2.1, so skip to §2.3.
+**Bridge Mininet into the conda environment, once.** One command for both
+routes, differing only in the source path — take the line matching the route you
+chose in §2.1.
 
 ```bash
-echo /usr/local/lib/python3.8/dist-packages \
-  > "$CONDA_PREFIX/lib/python3.8/site-packages/system_dist_packages.pth"
-python -c "import mininet; print(mininet.__file__)"   # must succeed
+conda activate stride
+S=/usr/lib/python3/dist-packages/mininet            # apt route (24.04)
+S=/usr/local/lib/python3.8/dist-packages/mininet    # source route (20.04)
+
+ln -sfn "$S" "$CONDA_PREFIX/lib/python3.8/site-packages/mininet"
+python -c "from mininet.net import Mininet; from mininet.link import TCLink; \
+           from mininet.node import RemoteController; print('ok')"
 ```
 
-A `.pth` file is plain text holding one path per line. On every start, Python
-reads every `.pth` under `site-packages/` and **appends** those paths to
-`sys.path`. Appended, not prepended, so conda's own numpy and torch keep
-priority and only what conda lacks — Mininet — falls through to the system copy.
+`ln` creates links. `-s` makes a symbolic link (a pointer to another path), `-f`
+overwrites an existing target, and `-n` replaces a target that is itself a link to
+a directory rather than descending into it. So the line places a link named
+`mininet` in the conda environment's `site-packages/` pointing at the system copy,
+and `import mininet` under the conda Python resolves to the real files. The second
+command is the check — it must print `ok`.
 
-**Why the two routes differ.** A source install targets 3.8, the same version as
-the conda environment, so the whole directory can be added safely. apt installs
-for 3.12, and that directory holds many other packages built for 3.12, which
-must not be added to a 3.8 path — hence a symlink for `mininet` alone.
+`sys.path` is not modified at all. An entry is added inside `site-packages/`,
+which was already on it. **Only `mininet` is linked in** — nothing else in the
+system directory (which also holds a second Ryu and a setuptools) becomes visible
+to conda.
 
-> **This file lives inside the conda environment.** Rebuilding the environment
+> **The link lives inside the conda environment.** Rebuilding the environment
 > after `conda env remove -n stride` removes it along with everything else, and
 > the two commands above have to be run again. The system Mininet is unaffected
-> and does not need reinstalling. Without the file, every real run stops at
+> and does not need reinstalling. Without the link, every real run stops at
 > `from mininet.net import Mininet`.
 
 ### 2.3 Ryu + delay patch
