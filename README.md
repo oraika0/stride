@@ -77,8 +77,20 @@ reports the package as missing. This line switches that component on.
 
 `systemctl` is systemd's control command, systemd being what Ubuntu now uses to
 manage background services. `enable` sets the service to start at boot, `--now`
-starts it immediately as well. Without the Open vSwitch daemon running, Mininet
-cannot create switches.
+starts it immediately as well.
+
+**Why the daemon has to be running rather than started on demand.** Open vSwitch
+is two resident processes, `ovsdb-server` (the configuration database) and
+`ovs-vswitchd` (the one that actually forwards packets). What Mininet runs when it
+creates a switch is `ovs-vsctl`, a **client** that issues commands to
+`ovsdb-server` over `/var/run/openvswitch/db.sock`. It does not start the daemons
+and has no way to. With them down, `ovs-vsctl` cannot connect and Mininet aborts
+with `Error connecting to ovs-db with ovs-vsctl`.
+
+So it is not started on demand — it has to be up beforehand. If you would rather
+it did not start at boot, replace `enable --now` with
+`sudo systemctl start openvswitch-switch` and run that yourself after each
+reboot. `enable` only saves you from remembering.
 
 These packages cover both Mininet and Open vSwitch, so Mininet's own `install.sh`
 is **not** needed here.
@@ -125,24 +137,6 @@ sudo mn --test pingall
 `install.sh -a` installs Open vSwitch too. Then do
 §2.2's `.pth` step so the conda env can see it.
 
-#### Where the installed files land
-
-Worth knowing on a shared machine:
-
-| Component | Path | Installed into |
-| --- | --- | --- |
-| Ryu, and its patch | `$CONDA_PREFIX/lib/python3.8/site-packages/ryu/` | conda env — nothing outside it is touched |
-| Mininet package | `/usr/local/lib/python3.8/dist-packages` (source) or `/usr/lib/python3/dist-packages` (apt) | system |
-| `mnexec`, `ovs-*` | `/usr/bin` | system |
-| the Mininet source tree | wherever you cloned it | a local directory, **deletable once installed** |
-
-Only the clone location is up to you — the command above puts it in the
-repository's gitignored `src/`, so everything you added to the machine except the
-system packages sits in one directory. The installation itself is system-wide either way: Mininet creates
-network namespaces and attaches to Open vSwitch, so it needs root regardless, and
-nothing in this repository can change that. On a shared server, check that
-Mininet and OVS are not already installed before adding a second copy.
-
 ### 2.2 Python environment
 
 ```bash
@@ -153,13 +147,24 @@ pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 \
 pip install -r requirements.txt
 ```
 
-**Bridge Mininet into the conda env — source installs only, once.** On 24.04 the
-symlink in §2.1 has already done this; skip to §2.3.
+#### Which Python runs what, and where each finds Mininet
 
-A source install puts Mininet in the *system* `dist-packages`, so the conda
-interpreter cannot see it. Create a `.pth` file that appends the system path. Python reads it
-automatically on every interpreter start from then on; nothing has to be repeated
-per run:
+**There is only one copy of the Mininet package**, in the system
+`dist-packages`. Nothing is copied and nothing is installed into conda. The only
+question is whether the conda interpreter can find that copy.
+
+| Who | Which Python | How it finds Mininet |
+| --- | --- | --- |
+| `mn`, `sudo mn -c` and the other CLI tools | the system `/usr/bin/python3` | already on its search path, nothing to do |
+| this repository's `main.py` | the **conda** `envs/stride/bin/python` | needs the `.pth` or the symlink |
+| the Ryu controller | the conda Python | does not import mininet at all |
+
+`main.py` builds the topology itself with `from mininet.net import Mininet`, and
+it runs under the conda interpreter (§4), so without this bridge it stops on that
+line.
+
+**Bridge Mininet into the conda environment — source installs only, once.** The
+apt route already did this with a symlink in §2.1, so skip to §2.3.
 
 ```bash
 echo /usr/local/lib/python3.8/dist-packages \
@@ -167,9 +172,21 @@ echo /usr/local/lib/python3.8/dist-packages \
 python -c "import mininet; print(mininet.__file__)"   # must succeed
 ```
 
-conda's own numpy/torch stay higher priority on `sys.path`; only Mininet falls
-through to the system copy. **If the env is ever rebuilt, recreate this file** —
-otherwise every real-environment run dies at `from mininet.net import Mininet`.
+A `.pth` file is plain text holding one path per line. On every start, Python
+reads every `.pth` under `site-packages/` and **appends** those paths to
+`sys.path`. Appended, not prepended, so conda's own numpy and torch keep
+priority and only what conda lacks — Mininet — falls through to the system copy.
+
+**Why the two routes differ.** A source install targets 3.8, the same version as
+the conda environment, so the whole directory can be added safely. apt installs
+for 3.12, and that directory holds many other packages built for 3.12, which
+must not be added to a 3.8 path — hence a symlink for `mininet` alone.
+
+> **This file lives inside the conda environment.** Rebuilding the environment
+> after `conda env remove -n stride` removes it along with everything else, and
+> the two commands above have to be run again. The system Mininet is unaffected
+> and does not need reinstalling. Without the file, every real run stops at
+> `from mininet.net import Mininet`.
 
 ### 2.3 Ryu + delay patch
 
@@ -241,6 +258,30 @@ python dataset/prepare_dataset.py --topology 32node --tms 144tm
 python dataset/prepare_dataset.py --topology 32node --tms 24tm
 python dataset/prepare_dataset.py --topology geant  --tms 24tm --tm_scale 3
 ```
+
+---
+
+### 2.6 Where the installed files land
+
+Three things are installed by now, and they land in different places. Worth
+knowing on a shared machine.
+
+| Component | Path | Installed into |
+| --- | --- | --- |
+| Ryu, and its patch | `$CONDA_PREFIX/lib/python3.8/site-packages/ryu/` | conda env, nothing outside it is touched |
+| Mininet package | `/usr/local/lib/python3.8/dist-packages` (source) or `/usr/lib/python3/dist-packages` (apt) | system |
+| `mnexec`, `ovs-*` | `/usr/bin` | system |
+| the Mininet source tree | wherever you cloned it | a local directory, **deletable once installed** |
+
+Only the clone location is up to you. The commands in §2.1 put it in the
+repository's gitignored `src/`, so everything you added to this machine except the
+system packages sits in one directory, and those 5 MB can go once the install is
+done.
+
+**Installing Mininet is a system-level act either way.** It creates network
+namespaces and drives Open vSwitch, both of which need root, and this repository
+cannot change that. On a shared server, check whether Mininet and Open vSwitch are
+already installed rather than installing a second copy.
 
 ---
 

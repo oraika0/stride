@@ -62,7 +62,11 @@ sudo mn --test pingall                    # 驗證
 
 `universe` 不是外部來源，它是 Ubuntu 官方套件庫的四個分區之一（`main`、`restricted`、`universe`、`multiverse`），放的是社群維護的套件，Mininet 就在裡面。桌面版預設會啟用這個分區，部分 server 與 cloud image 不會，那時 `apt install mininet` 會回報找不到套件。這一行就是把那個分區打開，讓 apt 看得到裡面的東西。
 
-`systemctl` 是 systemd 的管理指令，systemd 是 Ubuntu 現在用來管背景服務的元件。`enable` 設定開機自動啟動，`--now` 是順便立刻啟動一次。Open vSwitch 的 daemon 沒有在跑，Mininet 就建不出 switch。
+`systemctl` 是 systemd 的管理指令，systemd 是 Ubuntu 現在用來管背景服務的元件。`enable` 設定開機自動啟動，`--now` 是順便立刻啟動一次。
+
+**為什麼 daemon 要先開著，不能要用再叫。** Open vSwitch 是兩個常駐行程，`ovsdb-server`（設定資料庫）與 `ovs-vswitchd`（實際轉封包的那個）。Mininet 建 switch 時執行的是 `ovs-vsctl`，那是一個**用戶端**，透過 `/var/run/openvswitch/db.sock` 對 `ovsdb-server` 下命令。它不會、也沒有能力去啟動 daemon —— daemon 沒開，`ovs-vsctl` 連不上，Mininet 直接中止並印出 `Error connecting to ovs-db with ovs-vsctl`。
+
+所以不是「要用再叫」，是「要用之前必須已經在跑」。你不想讓它開機自動啟動的話，把 `enable --now` 換成 `sudo systemctl start openvswitch-switch`，每次重開機後自己跑一次也行。`enable` 只是免得要記得。
 
 apt 這一條已經把 Mininet 與 Open vSwitch 都裝好了，**不需要**再跑 Mininet 的 `install.sh`。
 
@@ -95,23 +99,6 @@ sudo mn --test pingall
 
 `install.sh -a` 會一併裝 Open vSwitch。裝完再做 §2.2 的 `.pth`。
 
-#### 安裝後的檔案落點
-
-在共用機器上值得知道：
-
-| 元件 | 路徑 | 安裝位置 |
-| --- | --- | --- |
-| Ryu 與它的 patch | `$CONDA_PREFIX/lib/python3.8/site-packages/ryu/` | conda env —— env 以外一個檔案都不會被動到 |
-| Mininet 套件 | `/usr/local/lib/python3.8/dist-packages`（原始碼）或 `/usr/lib/python3/dist-packages`（apt） | system |
-| `mnexec`、`ovs-*` | `/usr/bin` | system |
-| Mininet 原始碼樹 | 你 clone 的地方 | 本機目錄，**裝完就可以刪** |
-
-只有 clone 的位置由你決定 —— 上面的指令放在 repo 底下被 gitignore 的 `src/`，這樣你在
-這台機器上新增的檔案除了系統套件之外都集中在一個目錄，
-`install.sh` 跑完那 5 MB 就能刪掉。**安裝本身兩種方式都是系統層級的**：Mininet 要建
-network namespace、要接 Open vSwitch，本來就需要 root，這個 repo 改變不了。在共用
-server 上，先確認 Mininet 與 OVS 是不是已經裝好了，不要再裝第二份。
-
 ### 2.2 Python 環境
 
 ```bash
@@ -122,10 +109,19 @@ pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 \
 pip install -r requirements.txt
 ```
 
-**把 Mininet 橋接進 conda 環境——只有原始碼安裝需要，做一次就好。** 24.04 在 §2.1
-的 symlink 已經做過了，直接跳到 §2.3。 Mininet 裝在**系統的**
-`dist-packages`，conda 的直譯器看不到它。建立一個 `.pth` 檔把系統路徑接上。之後 Python
-每次啟動都會自動讀這個檔，不需要每次執行重做。
+#### 誰用哪個 Python，誰去哪裡找 Mininet
+
+**Mininet 的套件檔案只有一份**，在系統的 `dist-packages`。我們沒有複製它，也沒有在 conda 裡另外裝一份。要處理的只有「conda 的直譯器找不找得到那一份」。
+
+| 誰 | 用哪個 Python | 怎麼找到 Mininet |
+| --- | --- | --- |
+| `mn`、`sudo mn -c` 這些命令列工具 | 系統的 `/usr/bin/python3` | 本來就在它的搜尋路徑裡，不用處理 |
+| 這個 repo 的 `main.py` | **conda 的** `envs/stride/bin/python` | 要靠 `.pth` 或 symlink 接過去 |
+| Ryu controller | conda 的 python | 不需要，它不 import mininet |
+
+`main.py` 會 `from mininet.net import Mininet` 自己把拓樸建起來，而它是用 conda 的直譯器執行的（見 §4），所以缺了這個橋接就會中止在那一行。
+
+**把 Mininet 橋接進 conda 環境，只有原始碼安裝需要，做一次就好。** apt 路線在 §2.1 用 symlink 做過了，直接跳到 §2.3。
 
 ```bash
 echo /usr/local/lib/python3.8/dist-packages \
@@ -133,9 +129,11 @@ echo /usr/local/lib/python3.8/dist-packages \
 python -c "import mininet; print(mininet.__file__)"   # 必須成功
 ```
 
-conda 自己的 numpy/torch 在 `sys.path` 上優先級較高，只有 Mininet 會落到系統那份。
-**環境如果重建，這個檔案要重做**，否則每次 real 實驗都會中止於
-`from mininet.net import Mininet`。
+`.pth` 是一個純文字檔，內容就是一行路徑。Python 每次啟動都會讀 `site-packages/` 底下所有 `.pth`，把裡面的路徑**追加**到 `sys.path` 末端。追加而不是插到前面，所以 conda 自己的 numpy、torch 仍然優先，只有 conda 裡沒有的 Mininet 才會落到系統那一份。
+
+**兩條路線用不同做法的原因。** 原始碼安裝是裝給 3.8，跟 conda 環境同版本，整個目錄接進來沒問題。apt 是裝給 3.12，那個目錄裡還有一堆為 3.12 裝的別的套件，整包接進 3.8 會出事，所以只用 symlink 接 `mininet` 一個。
+
+> **這個檔案在 conda 環境裡面。** `conda env remove -n stride` 之後重建環境，它會跟著環境一起消失，要再跑一次上面那兩行。系統那邊的 Mininet 不受影響，不用重裝。漏掉的話每次 real 實驗都會中止於 `from mininet.net import Mininet`。
 
 ### 2.3 Ryu + 延遲量測 patch
 
@@ -196,6 +194,23 @@ python dataset/prepare_dataset.py --topology 32node --tms 144tm
 python dataset/prepare_dataset.py --topology 32node --tms 24tm
 python dataset/prepare_dataset.py --topology geant  --tms 24tm --tm_scale 3
 ```
+
+---
+
+### 2.6 安裝後的檔案落點
+
+到這裡三個東西裝完了，各自落在不同地方。在共用機器上值得知道。
+
+| 元件 | 路徑 | 安裝位置 |
+| --- | --- | --- |
+| Ryu 與它的 patch | `$CONDA_PREFIX/lib/python3.8/site-packages/ryu/` | conda env，env 以外一個檔案都不會被動到 |
+| Mininet 套件 | `/usr/local/lib/python3.8/dist-packages`（原始碼）或 `/usr/lib/python3/dist-packages`（apt） | system |
+| `mnexec`、`ovs-*` | `/usr/bin` | system |
+| Mininet 原始碼樹 | 你 clone 的地方 | 本機目錄，**裝完就可以刪** |
+
+只有 clone 的位置由你決定。§2.1 的指令放在 repo 底下被 gitignore 的 `src/`，這樣你在這台機器上新增的檔案除了系統套件之外都集中在一個目錄，裝完那 5 MB 就能刪掉。
+
+**Mininet 的安裝本身兩種方式都是系統層級的。** 它要建 network namespace、要接 Open vSwitch，本來就需要 root，這個 repo 改變不了。在共用 server 上先確認 Mininet 與 OVS 是不是已經裝好了，不要再裝第二份。
 
 ---
 
