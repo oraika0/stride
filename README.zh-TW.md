@@ -66,7 +66,7 @@ sudo mn --test pingall                    # 驗證
 
 **為什麼 daemon 要先開著，不能要用再叫。** Open vSwitch 是兩個常駐行程，`ovsdb-server`（設定資料庫）與 `ovs-vswitchd`（實際轉封包的那個）。Mininet 建 switch 時執行的是 `ovs-vsctl`，那是一個**用戶端**，透過 `/var/run/openvswitch/db.sock` 對 `ovsdb-server` 下命令。它不會、也沒有能力去啟動 daemon —— daemon 沒開，`ovs-vsctl` 連不上，Mininet 直接中止並印出 `Error connecting to ovs-db with ovs-vsctl`。
 
-所以不是「要用再叫」，是「要用之前必須已經在跑」。你不想讓它開機自動啟動的話，把 `enable --now` 換成 `sudo systemctl start openvswitch-switch`，每次重開機後自己跑一次也行。`enable` 只是免得要記得。
+所以不是「要用再叫」，是「要用之前必須已經在跑」。
 
 apt 這一條已經把 Mininet 與 Open vSwitch 都裝好了，**不需要**再跑 Mininet 的 `install.sh`。
 
@@ -191,7 +191,6 @@ python scripts/patch_ryu.py --check      # exit 0 = 已 patch
 
 ```bash
 python dataset/prepare_dataset.py --topology 32node --tms 144tm
-python dataset/prepare_dataset.py --topology 32node --tms 24tm
 python dataset/prepare_dataset.py --topology geant  --tms 24tm --tm_scale 3
 ```
 

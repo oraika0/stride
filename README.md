@@ -87,10 +87,7 @@ creates a switch is `ovs-vsctl`, a **client** that issues commands to
 and has no way to. With them down, `ovs-vsctl` cannot connect and Mininet aborts
 with `Error connecting to ovs-db with ovs-vsctl`.
 
-So it is not started on demand — it has to be up beforehand. If you would rather
-it did not start at boot, replace `enable --now` with
-`sudo systemctl start openvswitch-switch` and run that yourself after each
-reboot. `enable` only saves you from remembering.
+So it is not started on demand — it has to be up beforehand.
 
 These packages cover both Mininet and Open vSwitch, so Mininet's own `install.sh`
 is **not** needed here.
@@ -255,7 +252,6 @@ are started inside it.
 
 ```bash
 python dataset/prepare_dataset.py --topology 32node --tms 144tm
-python dataset/prepare_dataset.py --topology 32node --tms 24tm
 python dataset/prepare_dataset.py --topology geant  --tms 24tm --tm_scale 3
 ```
 
