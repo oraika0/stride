@@ -612,6 +612,9 @@ dataset/extend_k_paths.py        建立 K=30 候選檔，同時保留固定的 K
 - **機器太慢**可能讓 controller 錯過 30 秒的啟動視窗，之後 agent process 會出錯。照
   §4 的方式清乾淨再重跑。
 - **`sudo -E` 不保證傳遞環境變數**。一律用 `sudo -E "VAR=value" "$PY" ...` 的形式。
+- **controller 可能在訓練途中停止更新量測**，而 run 依然會跑完全部步數、存下
+  checkpoint、畫出持續變動的 reward 曲線。訓練進行中就要確認量測仍在落地，見
+  [`docs/controller_stops_measuring.md`](docs/controller_stops_measuring.md)。
 
 ---
 

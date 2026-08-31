@@ -735,6 +735,11 @@ dataset/extend_k_paths.py        build a K=30 candidate file while preserving th
   after which the agent process errors out. Shut everything down (§4) and retry.
 - **`sudo -E` does not reliably forward variables.** Always use the
   `sudo -E "VAR=value" python ...` form.
+- **The controller can stop updating its measurements mid-run**, and the run
+  still completes every step, saves a checkpoint and draws a reward curve that
+  keeps moving. Confirm measurements are still landing while the run is in
+  progress. See
+  [`docs/controller_stops_measuring.md`](docs/controller_stops_measuring.md).
 
 ---
 
