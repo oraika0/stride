@@ -382,8 +382,8 @@ STRIDE_VARIANT=M4 ./scripts/run_chain.sh                # 換架構
 提示。在 tmux 裡跑，controller 與 drl 會開成額外的視窗。
 
 controller 中途停止量測的 run 一樣會跑完全部步數、存下 checkpoint、畫出持續變動的
-reward 曲線，因為 reward 跟著 action 走，不是跟著網路走。量測是否持續落地必須在訓練
-進行中盯著，見
+reward 曲線，因為 reward 跟著 action 走，不是跟著網路走。量測檔案是否還在更新必須在
+訓練進行中確認，見
 [`docs/controller_stops_measuring.md`](docs/controller_stops_measuring.md)。
 
 ### 收尾清理
@@ -613,7 +613,7 @@ dataset/extend_k_paths.py        建立 K=30 候選檔，同時保留固定的 K
   §4 的方式清乾淨再重跑。
 - **`sudo -E` 不保證傳遞環境變數**。一律用 `sudo -E "VAR=value" "$PY" ...` 的形式。
 - **controller 可能在訓練途中停止更新量測**，而 run 依然會跑完全部步數、存下
-  checkpoint、畫出持續變動的 reward 曲線。訓練進行中就要確認量測仍在落地，見
+  checkpoint、畫出持續變動的 reward 曲線。訓練進行中就要確認量測檔案還在更新，見
   [`docs/controller_stops_measuring.md`](docs/controller_stops_measuring.md)。
 
 ---
