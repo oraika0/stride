@@ -143,6 +143,27 @@ B 這邊機制不明，只能講量到的差異。卡住的是共用的 Xeon Sil
 
 五步是 50 秒的凍結檔案，對照的是整整八小時對著它訓練。
 
+### 中止時看到什麼
+
+原因寫進 `.drl_done`，`main.py` 讀回來印在 `chain` pane —— 八小時的 run 沒有人在看
+`drl` pane，所以理由要出現在會看的那一格。
+
+```
+[main] TRAINING ABORTED -- aborted at step 25: net_info_directed.csv stopped changing
+[main] The controller stopped writing measurements, so the agent stopped rather
+       than train on a frozen file for the rest of the run.
+[main] Full traceback: the drl window, or results/_terminal_logs/drl_*.log
+[main] What to check next: docs/controller_stops_measuring.md
+
+[chain] training exited 1 -- stopping before the test
+```
+
+寫 `.drl_done` 是必要的：`env_loader.start_traffic` 要看到它才會停止循環 TM，agent 死掉
+卻沒寫，流量產生器會一直跑，`main.py` 就卡在那裡等。
+
+`results/<alg>/` 刻意不歸檔，凍結當下的量測檔留在原地。`runs/` 底下不會多出目錄，chain
+因此連測試階段都不會進。
+
 ## 診斷
 
 ```bash
