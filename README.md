@@ -101,13 +101,13 @@ sudo mn --test pingall
 ```
 
 `-n` installs Mininet's dependencies and core files, `-v` installs Open vSwitch,
-and those two are all that is needed. **Not the default `-a`**, which also brings
+and those two are all that is needed. `-a` is not needed: it also brings
 POX, oflops and the OpenFlow reference implementation, none of which this
 repository uses.
 
 `-s` says where dependency source trees go — here into `src/` rather than
-scattered around `$HOME` — and it **has to come before `-nv`**. The parentheses
-are deliberate: they keep the `cd` inside a subshell, so you end up back at the
+scattered around `$HOME` — and it **has to come before `-nv`**. The
+parentheses keep the `cd` inside a subshell, so you end up back at the
 repository root. `src/` is already in `.gitignore`.
 
 Then continue with §2.2, which links it into the conda environment.

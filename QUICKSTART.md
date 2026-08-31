@@ -66,9 +66,9 @@ SRC="$PWD/src"
 (cd src/mininet/util && ./install.sh -s "$SRC" -nv)
 ```
 
-The parentheses are deliberate: they keep the `cd` inside a subshell, so you are
-still at the repository root afterwards. `src/` is gitignored, so none of this
-gets committed.
+The parentheses keep the `cd` inside a subshell, so you are still at the
+repository root afterwards. `src/` is gitignored, so none of this gets
+committed.
 
 ## 3. Python environment
 

@@ -60,7 +60,7 @@ SRC="$PWD/src"
 (cd src/mininet/util && ./install.sh -s "$SRC" -nv)
 ```
 
-那對括號是刻意的 —— 它讓 `cd` 只在子 shell 裡生效，跑完你還在 repo 根目錄。`src/` 已經在
+使用括弧讓 `cd` 只在子 shell 裡生效，跑完你還在 repo 根目錄。`src/` 已經在
 `.gitignore` 裡，不會被 commit 進去。
 
 ## 3. Python 環境
