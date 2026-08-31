@@ -302,24 +302,10 @@ repo 內的腳本用同樣的慣例，都從 `$HOME` 推導直譯器路徑，所
 
 ### 真實 Mininet 是唯一維護中的路徑
 
-訓練模式由演算法 config 裡的 `sim_training` 決定，**不是**命令列參數。`main.py` 把未
-設定視為 `False`，所以：
-
-| 演算法 | `sim_training` | 模式 |
-| --- | --- | --- |
-| `ls2ic_nx` | `True` | fluid-queue 模擬器 |
-| `stride` | `False` | 真實 Mininet，所有變體皆是 |
-| 其餘全部 | 未設定 → `False` | 真實 Mininet |
-
-> **模擬訓練路徑目前沒有在維護。** 只有 `ls2ic_nx` 還接著它，而那份程式碼沒有跟著
-> repo 其他部分更新，是過時的。要用的話得自己修。**STRIDE 根本沒有模擬訓練的變體。**
-> 本文件從這裡開始的所有內容都以真實 Mininet 為準。
-
-**評估階段的模擬同樣沒有維護。** `test_sim_only.py` 用 fluid-queue 模型對路由決策評
-分。它原本會在每次 `--auto` 測試 session 結束時被自動呼叫，在真實量測旁邊寫下一份
-`sim/`。那個呼叫已經移除，因為 sim 那半邊已經退化成只跑單一 TM，跟旁邊的 real 結果不再
-可比。論文的任何圖表都沒有讀過它。腳本本身還在，也還能單獨執行，但它的輸出請當作未經
-驗證的東西看待。
+模擬路徑在訓練與評估兩端都已停止維護，本文件其餘部分一律以真實 Mininet 為準。訓練模式
+由演算法 config 裡的 `sim_training` 決定，未設定即為 `False`，STRIDE 的所有變體都是
+`False`。評估側的 `test_sim_only.py` 仍可單獨執行，但其輸出未經驗證，論文的任何圖表都
+沒有讀過它。
 
 ### 訓練
 
@@ -346,7 +332,7 @@ sudo -E "STRIDE_VARIANT=nodiff" "$PY" main.py \
 
 那兩個開在哪由 `--terminal` 決定：
 
-| | |
+| 值 | 行為 |
 | --- | --- |
 | `tmux` | 各開一個 window 在 detached 的 `stride` session 裡 —— `tmux attach -t stride` 就能看。不需要 DISPLAY，所以 SSH 進來也能跑，而且 window 會活得比 process 久，當掉的畫面留得住。 |
 | `gnome` | 各開一個 gnome-terminal 視窗。需要圖形環境，在 `sudo` 下還需要上面那些變數。 |
@@ -393,24 +379,17 @@ STRIDE_VARIANT=M4 ./scripts/run_chain.sh                # 換架構
 而測錯的結果看起來跟測對的一模一樣。新增不是剛好一個就中止，不猜。
 
 開頭問一次 sudo 密碼，之後背景每分鐘 refresh，八小時的訓練不會在你離開之後停在密碼
-提示。在 tmux 裡跑，controller 與 drl 會開成旁邊的視窗。
+提示。在 tmux 裡跑，controller 與 drl 會開成額外的視窗。
 
-跑完之後先看 `measurement.txt`，它決定這次結果能不能用。
-
-```bash
-cat results/<alg>/runs/<run>/train/measurement.txt   # stale_seconds 應為個位數
-```
-
-controller 中途停止量測的 run 一樣會跑完全部步數、存下
-checkpoint、畫出持續變動的 reward 曲線 —— 因為 reward 跟著 action 走，不是跟著網路走。
-`stale_seconds` 是訓練結束前多久最後一次量測落地，超過一個監控週期就代表那段時間
-agent 都在對著不再更新的檔案訓練。見
+controller 中途停止量測的 run 一樣會跑完全部步數、存下 checkpoint、畫出持續變動的
+reward 曲線，因為 reward 跟著 action 走，不是跟著網路走。量測是否持續落地必須在訓練
+進行中盯著，見
 [`docs/controller_stops_measuring.md`](docs/controller_stops_measuring.md)。
 
 ### 收尾清理
 
 ```bash
-./scripts/clean.sh              # 或指定 alg：./scripts/clean.sh <alg>
+./scripts/clean.sh
 ```
 
 `clean.sh` 就是把 `mn -c` 跟那幾個 kill 用真正有效的順序做一遍，然後檢查結果。
@@ -452,9 +431,8 @@ ls config/env config/algs config/controller | sed 's/_config\.py//'
 
 - **env**：`geant`、`geant_directed`、`32node_24tm`、`32node_144tm`、
   `32node_144tm_directed`、`32node_144tm_directed_k30`
-- **alg**：`stride`、`ls2ic`、`ls2ic_dd`、`ls2ic_nx`、`ps_dqn`、`ps_dqn_a`、
-  `ps_dqn_dd`、`drsir`、`drsir_dd`、`ospf`、`widest_path`、`adaptive_dijkstra`、
-  `meanfield`、`ilp`
+- **alg**：`stride`、`ls2ic`、`ls2ic_dd`、`ps_dqn`、`ps_dqn_a`、`ps_dqn_dd`、
+  `drsir`、`drsir_dd`、`ospf`、`widest_path`、`ilp`
 - **ctrl**：`simple_monitor`
 
 seed 不屬於上面任何一層，它是命令列的 `--seed`，對所有演算法一視同仁。
@@ -544,12 +522,43 @@ session 結束時寫下的歸檔，旁邊的其他目錄都是即時交換區。
 
 ## 7. 論文圖表
 
-```text
-paper/figures/<topic>/make_*.py     重新產生某一組圖
-paper/figures/reward/*.csv          訓練曲線快取，見下方說明
-paper/tables/build_paper_table.py   LP/ILP 比較表
-paper/figures/algo/                 演算法虛擬碼渲染
+每個圖表對應哪一支生成器，列在 [`paper/README.md`](paper/README.md)。所有生成器都從
+`__file__` 推導路徑，在哪個目錄執行都可以，也都不需要網路。
+
+一次重新產生全部：
+
+```bash
+# reward 系列的圖依賴這份快取，要先跑
+"$PY" paper/figures/reward/make_curves_csv.py
+
+# 圖
+"$PY" paper/figures/reward/make_reward_fig.py              # 圖 13、15
+"$PY" paper/figures/reward/make_reward_components_fig.py   # 圖 16
+"$PY" paper/figures/holdout/make_holdout_fig.py            # 圖 14、17 與表 8、9
+"$PY" paper/figures/denoise_step/make_denoise_step_fig.py  # 圖 18 與表 10
+"$PY" paper/figures/ablation/make_ablation_fig.py          # 圖 19 與表 11
+"$PY" paper/figures/dataset/make_dataset_figs.py           # 圖 6-11
+"$PY" paper/figures/dataset/make_demand_concentration.py   # 圖 12
+
+# 表與理論界
+"$PY" paper/figures/k_ablation/make_k_fig.py               # 表 13
+"$PY" paper/bounds/k_oracle_curve.py                       # 表 12
+"$PY" paper/tables/build_paper_table.py                    # LP/ILP 比較表
+
+# 內文引用的時間數字
+"$PY" paper/figures/timing/train_steps/make_timing_table.py
 ```
+
+三支有額外條件，不在上面那批裡：
+
+| 生成器 | 需要 |
+| --- | --- |
+| `figures/timing/inference/make_inference_bench.py` | GPU 與 `results/` 底下的 checkpoint |
+| `figures/algo/render_algo_stride.py` | LaTeX（`pdflatex`）與 `pdftoppm` |
+| `figures/control_delay/crop_control_delay.py` | `pdftoppm`，且裁切的是既有的投影片匯出 |
+
+`figures/timing/train_steps/make_timing_csv.py` 只在新增 run 時才需要跑，它把新的訓練
+log 併進已經版控的 `timing_steps.csv`。
 
 
 圖表腳本讀的是 `results/<alg>/runs/<run>/test/<session>/real/<tm>/...`，也就是**評估輸出**，不是

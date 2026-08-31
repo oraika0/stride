@@ -371,28 +371,12 @@ work unchanged on any machine and user account.
 
 ### Real Mininet is the supported path
 
-Training mode is decided by `sim_training` in the algorithm config — **not** by a
-command-line flag. `main.py` treats an unset value as `False`, so:
-
-| Algorithm | `sim_training` | Mode |
-| --- | --- | --- |
-| `ls2ic_nx` | `True` | fluid-queue simulator |
-| `stride` | `False` | real Mininet, every variant |
-| everything else | unset -> `False` | real Mininet |
-
-> **The simulation-training path is not maintained.** `ls2ic_nx` is the only
-> algorithm still wired to it, and that code has not been kept in step with the
-> rest of the repository — expect to fix things yourself before it runs. **STRIDE
-> has no simulation-training variant at all.** Everything below assumes real
-> Mininet.
-
-**Evaluation-time simulation is not maintained either.** `test_sim_only.py`
-scores routing decisions against the fluid-queue model. It used to be invoked
-automatically at the end of every `--auto` test session, writing a `sim/` half
-next to the real measurements; that call was removed, because the sim half had
-drifted to covering a single TM and was no longer comparable to the real half
-beside it. No figure or table in the paper ever read it. The script is still
-here and still runs standalone, but treat its output as unvalidated.
+The simulated path is unmaintained on both the training and the evaluation side,
+and the rest of this document assumes real Mininet throughout. Training mode is
+decided by `sim_training` in the algorithm config, an unset value means `False`,
+and every STRIDE variant is `False`. On the evaluation side `test_sim_only.py`
+still runs standalone, but its output is unvalidated and no figure or table in
+the paper reads it.
 
 ### Training
 
@@ -421,7 +405,7 @@ and the agent.
 
 Where those two go is `--terminal`:
 
-| | |
+| Value | Behaviour |
 | --- | --- |
 | `tmux` | a window each in a detached `stride` session — `tmux attach -t stride` to watch. No DISPLAY needed, so this works over SSH, and a window outlives the process it ran so a crash stays readable. |
 | `gnome` | a gnome-terminal window each. Needs a graphical session, and under `sudo` needs the variables above. |
@@ -477,26 +461,18 @@ the difference is not exactly one directory it stops rather than guessing.
 
 sudo is asked for once at the start and refreshed in the background, so an
 eight-hour run does not halt at a password prompt hours after you left. Run it
-inside tmux; the controller and the agent open windows beside it.
+inside tmux; the controller and the agent open additional windows.
 
-Read `measurement.txt` first. It decides whether the run is usable.
-
-```bash
-cat results/<alg>/runs/<run>/train/measurement.txt   # stale_seconds should be single digits
-```
-
-A run whose controller stopped
-measuring partway still produces a full step count, a saved checkpoint and a
-reward curve that keeps moving, because the reward follows the action rather
-than the network -- `stale_seconds` is how long before the end the last
-measurement landed, and anything past a monitoring period means the agent spent
-that time training against a file that stopped updating. See
+A run whose controller stopped measuring partway still produces a full step
+count, a saved checkpoint and a reward curve that keeps moving, because the
+reward follows the action rather than the network. Whether measurements keep
+landing has to be watched while the run is in progress, not afterwards. See
 [`docs/controller_stops_measuring.md`](docs/controller_stops_measuring.md).
 
 ### Shutdown
 
 ```bash
-./scripts/clean.sh            # or: ./scripts/clean.sh <alg>
+./scripts/clean.sh
 ```
 
 `clean.sh` does `mn -c` and the process kills in the order that actually works,
@@ -542,9 +518,8 @@ At the time of writing:
 
 - **env**: `geant`, `geant_directed`, `32node_24tm`, `32node_144tm`,
   `32node_144tm_directed`, `32node_144tm_directed_k30`
-- **alg**: `stride`, `ls2ic`, `ls2ic_dd`, `ls2ic_nx`, `ps_dqn`, `ps_dqn_a`,
-  `ps_dqn_dd`, `drsir`, `drsir_dd`, `ospf`, `widest_path`, `adaptive_dijkstra`,
-  `meanfield`, `ilp`
+- **alg**: `stride`, `ls2ic`, `ls2ic_dd`, `ps_dqn`, `ps_dqn_a`, `ps_dqn_dd`,
+  `drsir`, `drsir_dd`, `ospf`, `widest_path`, `ilp`
 - **ctrl**: `simple_monitor`
 
 The seed is not part of any of these. It is `--seed` on the command line, for
@@ -644,12 +619,45 @@ session; everything beside it is scratch.
 
 ## 7. Paper figures and tables
 
-```text
-paper/figures/<topic>/make_*.py     regenerate one figure group
-paper/figures/reward/*.csv          cached training curves (see below)
-paper/tables/build_paper_table.py   LP/ILP comparison tables
-paper/figures/algo/                 algorithm pseudocode rendering
+Which generator produces which figure or table is listed in
+[`paper/README.md`](paper/README.md). Every generator resolves its paths from
+`__file__`, so it runs from any directory, and none of them needs the network.
+
+Regenerating everything:
+
+```bash
+# the reward figures read this cache, so it goes first
+"$PY" paper/figures/reward/make_curves_csv.py
+
+# figures
+"$PY" paper/figures/reward/make_reward_fig.py              # Fig 13, 15
+"$PY" paper/figures/reward/make_reward_components_fig.py   # Fig 16
+"$PY" paper/figures/holdout/make_holdout_fig.py            # Fig 14, 17 + Table 8, 9
+"$PY" paper/figures/denoise_step/make_denoise_step_fig.py  # Fig 18 + Table 10
+"$PY" paper/figures/ablation/make_ablation_fig.py          # Fig 19 + Table 11
+"$PY" paper/figures/dataset/make_dataset_figs.py           # Fig 6-11
+"$PY" paper/figures/dataset/make_demand_concentration.py   # Fig 12
+
+# tables and theoretical bounds
+"$PY" paper/figures/k_ablation/make_k_fig.py               # Table 13
+"$PY" paper/bounds/k_oracle_curve.py                       # Table 12
+"$PY" paper/tables/build_paper_table.py                    # LP/ILP comparison
+
+# the timing numbers quoted in the text
+"$PY" paper/figures/timing/train_steps/make_timing_table.py
 ```
+
+Three have requirements beyond that batch:
+
+| Generator | Needs |
+| --- | --- |
+| `figures/timing/inference/make_inference_bench.py` | a GPU and the checkpoints under `results/` |
+| `figures/algo/render_algo_stride.py` | LaTeX (`pdflatex`) and `pdftoppm` |
+| `figures/control_delay/crop_control_delay.py` | `pdftoppm`, and it crops an existing slide export |
+
+`figures/timing/train_steps/make_timing_csv.py` is only needed when a run is
+added; it appends fresh training logs into the version-controlled
+`timing_steps.csv`.
 
 
 Each generator names the sessions it reads outright, so which run a figure comes
