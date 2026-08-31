@@ -407,12 +407,12 @@ reward 曲線，因為 reward 跟著 action 走，不是跟著網路走。量測
 一次執行由三個彼此獨立的選擇決定，每個對應一個命令列參數。
 
 ```bash
-"$PY" main.py --env geant --alg stride --ctrl simple_monitor train
+"$PY" main.py --env geant_directed --alg stride --ctrl simple_monitor train
 ```
 
 | 參數 | 決定什麼 | 讀哪個檔 |
 | --- | --- | --- |
-| `--env` | 用哪個拓樸與流量 | `config/env/geant_config.py` |
+| `--env` | 用哪個拓樸與流量 | `config/env/geant_directed_config.py` |
 | `--alg` | 用哪個演算法 | `config/algs/stride_config.py` |
 | `--ctrl` | 用哪個 Ryu controller app | `config/controller/simple_monitor_config.py` |
 

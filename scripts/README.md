@@ -83,7 +83,7 @@ See [README](../README.md) §4. The short version:
 ```bash
 sudo -v
 sudo -E "STRIDE_VARIANT=<name>" "$HOME/miniconda3/envs/stride/bin/python" \
-    main.py --env geant --alg stride train
+    main.py --env geant_directed --alg stride train
 ```
 
 Write `STRIDE_VARIANT` as a positional `NAME=VALUE` assignment inside the `sudo`

@@ -492,12 +492,12 @@ then checks the result:
 A run is configured by three independent choices, one per command-line flag:
 
 ```bash
-"$PY" main.py --env geant --alg stride --ctrl simple_monitor train
+"$PY" main.py --env geant_directed --alg stride --ctrl simple_monitor train
 ```
 
 | flag | answers | reads |
 | --- | --- | --- |
-| `--env` | which topology and traffic | `config/env/geant_config.py` |
+| `--env` | which topology and traffic | `config/env/geant_directed_config.py` |
 | `--alg` | which algorithm | `config/algs/stride_config.py` |
 | `--ctrl` | which Ryu controller app | `config/controller/simple_monitor_config.py` |
 
