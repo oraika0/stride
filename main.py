@@ -244,12 +244,40 @@ def main():
         # 用 pkill -f 對 cmdline regex 才抓得到（ryu-manager 實際 binary 是
         # python，killall 找不到）。對 Popen 本身的 wait() 也加 timeout 防止
         # gnome-terminal hang。
-        print("Training finished, clean up.")
+        # start_traffic only returns once .drl_done exists, and the abort path
+        # fills that file with its reason. The agent's traceback lands in the
+        # drl window, but this is the pane anyone actually watches, so the
+        # reason has to be readable here too.
+        abort_reason = ""
+        try:
+            with open(f"./results/{alg_cfg['algs_name']}/.drl_done") as fh:
+                first = fh.read().strip().splitlines()[0] if fh else ""
+            if first.startswith("aborted"):
+                abort_reason = first
+        except (OSError, IndexError):
+            pass
+
+        if abort_reason:
+            print("=" * 78)
+            print(f"[main] TRAINING ABORTED -- {abort_reason}")
+            print("[main] The controller stopped writing measurements, so the agent "
+                  "stopped rather than train on a frozen file for the rest of the run.")
+            print("[main] Full traceback: the drl window, or "
+                  "results/_terminal_logs/drl_*.log")
+            print("[main] What to check next: docs/controller_stops_measuring.md")
+            print("=" * 78)
+        else:
+            print("Training finished, clean up.")
         net.stop()
         # The agent writes .drl_done and exits on its own; a non-zero status
         # means it died instead, which used to pass unnoticed because nothing
-        # looked at it.
-        drl_status = drl_proc.poll()
+        # looked at it. wait() rather than poll(): the agent can still be
+        # printing its traceback when start_traffic notices the sentinel, and a
+        # poll() there reads None and loses the status.
+        try:
+            drl_status = drl_proc.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            drl_status = None
         if drl_status not in (None, 0):
             print(f"[main] WARNING: the DRL agent exited with status {drl_status} "
                   f"-- this run's archive may be incomplete.")
@@ -271,8 +299,10 @@ def main():
         # Cleanup first, exit status second: scripts/run_chain.sh reads this to
         # decide whether to go on and test the checkpoint, and a run the agent
         # aborted must not be tested.
-        if drl_status not in (None, 0):
-            raise SystemExit(drl_status)
+        # abort_reason is the authority: it says the agent decided to stop, and
+        # it survives whatever the exit status did.
+        if abort_reason or drl_status not in (None, 0):
+            raise SystemExit(drl_status if drl_status not in (None, 0) else 1)
     else:
         # SimpleNamespace 給 training()
         # drl_proc = spawn_drl(merged_cfg, args.mode)
