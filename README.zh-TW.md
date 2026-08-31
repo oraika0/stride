@@ -60,13 +60,11 @@ mn --version                              # 2.3.0
 sudo mn --test pingall                    # 驗證
 ```
 
-`universe` 不是外部來源，它是 Ubuntu 官方套件庫的四個分區之一（`main`、`restricted`、`universe`、`multiverse`），放的是社群維護的套件，Mininet 就在裡面。桌面版預設會啟用這個分區，部分 server 與 cloud image 不會，那時 `apt install mininet` 會回報找不到套件。這一行就是把那個分區打開，讓 apt 看得到裡面的東西。
+`universe` 是 Ubuntu 官方套件庫的四個分區之一（`main`、`restricted`、`universe`、`multiverse`），放的是社群維護的套件，Mininet 在裡面。桌面版預設啟用，部分 server 與 cloud image 不會，那時 `apt install mininet` 會回報找不到套件。這一行把那個分區打開。
 
-`systemctl` 是 systemd 的管理指令，systemd 是 Ubuntu 現在用來管背景服務的元件。`enable` 設定開機自動啟動，`--now` 是順便立刻啟動一次。
+`systemctl enable --now` 讓 Open vSwitch 開機自動啟動，並立刻先啟動一次。
 
-**為什麼 daemon 要先開著，不能要用再叫。** Open vSwitch 是兩個常駐行程，`ovsdb-server`（設定資料庫）與 `ovs-vswitchd`（實際轉封包的那個）。Mininet 建 switch 時執行的是 `ovs-vsctl`，那是一個**用戶端**，透過 `/var/run/openvswitch/db.sock` 對 `ovsdb-server` 下命令。它不會、也沒有能力去啟動 daemon —— daemon 沒開，`ovs-vsctl` 連不上，Mininet 直接中止並印出 `Error connecting to ovs-db with ovs-vsctl`。
-
-所以不是「要用再叫」，是「要用之前必須已經在跑」。
+Open vSwitch 是兩個常駐行程，`ovsdb-server` 存設定、`ovs-vswitchd` 實際轉封包。Mininet 建 switch 時執行的 `ovs-vsctl` 只是用戶端，透過 `/var/run/openvswitch/db.sock` 對 `ovsdb-server` 下命令，沒有能力把 daemon 叫起來。daemon 不在，`ovs-vsctl` 連不上，Mininet 直接中止並印出 `Error connecting to ovs-db with ovs-vsctl`，所以它必須在 Mininet 執行前就已經在跑。
 
 apt 這一條已經把 Mininet 與 Open vSwitch 都裝好了，**不需要**再跑 Mininet 的 `install.sh`。
 
@@ -204,7 +202,7 @@ python dataset/prepare_dataset.py --topology geant  --tms 24tm --tm_scale 3
 
 只有 clone 的位置由你決定。§2.1 的指令放在 repo 底下被 gitignore 的 `src/`，這樣你在這台機器上新增的檔案除了系統套件之外都集中在一個目錄，裝完那 5 MB 就能刪掉。
 
-**Mininet 的安裝本身兩種方式都是系統層級的。** 它要建 network namespace、要接 Open vSwitch，本來就需要 root，這個 repo 改變不了。在共用 server 上先確認 Mininet 與 OVS 是不是已經裝好了，不要再裝第二份。
+**Mininet 的安裝本身兩種方式都是系統層級的。** 它要建 network namespace、要接 Open vSwitch，本來就需要 root，這個 repo 改變不了。在共用 server 上先確認 Mininet 與 OVS 有沒有裝過，不要再裝第二份。
 
 ---
 
@@ -307,7 +305,7 @@ echo 'PY="$HOME/miniconda3/envs/stride/bin/python"' >> ~/.bashrc
 ### 真實 Mininet 是唯一維護中的路徑
 
 訓練模式由演算法 config 裡的 `sim_training` 決定，**不是**命令列參數。`main.py` 把未
-設定視為 `False`，所以。
+設定視為 `False`，所以：
 
 | 演算法 | `sim_training` | 模式 |
 | --- | --- | --- |

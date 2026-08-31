@@ -69,25 +69,22 @@ mn --version                              # 2.3.0
 sudo mn --test pingall                    # verify
 ```
 
-`universe` is not an external source. It is one of the four components of the
-official Ubuntu archive (`main`, `restricted`, `universe`, `multiverse`) and holds
-community-maintained packages, Mininet among them. Desktop installations enable it
-by default, some server and cloud images do not, and `apt install mininet` then
-reports the package as missing. This line switches that component on.
+`universe` is one of the four components of the official Ubuntu archive (`main`,
+`restricted`, `universe`, `multiverse`) and holds community-maintained packages,
+Mininet among them. Desktop installations enable it by default, some server and
+cloud images do not, and `apt install mininet` then reports the package as
+missing. This line switches that component on.
 
-`systemctl` is systemd's control command, systemd being what Ubuntu now uses to
-manage background services. `enable` sets the service to start at boot, `--now`
-starts it immediately as well.
+`systemctl enable --now` sets Open vSwitch to start at boot and starts it
+immediately as well.
 
-**Why the daemon has to be running rather than started on demand.** Open vSwitch
-is two resident processes, `ovsdb-server` (the configuration database) and
-`ovs-vswitchd` (the one that actually forwards packets). What Mininet runs when it
-creates a switch is `ovs-vsctl`, a **client** that issues commands to
-`ovsdb-server` over `/var/run/openvswitch/db.sock`. It does not start the daemons
-and has no way to. With them down, `ovs-vsctl` cannot connect and Mininet aborts
-with `Error connecting to ovs-db with ovs-vsctl`.
-
-So it is not started on demand — it has to be up beforehand.
+Open vSwitch is two resident processes, `ovsdb-server` for the configuration
+database and `ovs-vswitchd` for the forwarding itself. The `ovs-vsctl` that
+Mininet runs when it creates a switch is only a client: it issues commands to
+`ovsdb-server` over `/var/run/openvswitch/db.sock` and has no way to start the
+daemons. With them down `ovs-vsctl` cannot connect and Mininet aborts with
+`Error connecting to ovs-db with ovs-vsctl`, so they have to be up before
+Mininet runs.
 
 These packages cover both Mininet and Open vSwitch, so Mininet's own `install.sh`
 is **not** needed here.
