@@ -122,13 +122,13 @@ pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 \
 pip install -r requirements.txt
 ```
 
-#### Which Python runs what, and where each finds Mininet
+#### Interpreters and the Mininet package
 
-**There is only one copy of the Mininet package**, in the system
-`dist-packages`. Nothing is copied and nothing is installed into conda. The only
-question is whether the conda interpreter can find that copy.
+There is one copy of the Mininet package, in the system `dist-packages`. It is
+neither copied nor reinstalled into conda. What has to be arranged is that the
+conda interpreter can find it.
 
-| Who | Which Python | How it finds Mininet |
+| Component | Interpreter | Mininet source |
 | --- | --- | --- |
 | `mn`, `sudo mn -c` and the other CLI tools | the system `/usr/bin/python3` | already on its search path, nothing to do |
 | this repository's `main.py` | the **conda** `envs/stride/bin/python` | needs the symlink |
@@ -159,8 +159,8 @@ a directory rather than descending into it. So the line places a link named
 and `import mininet` under the conda Python resolves to the real files. The second
 command is the check — it must print `ok`.
 
-`sys.path` is not modified at all. An entry is added inside `site-packages/`,
-which was already on it. **Only `mininet` is linked in** — nothing else in the
+This does not modify `sys.path`. It adds an entry inside `site-packages/`, which
+was already on it. **Only `mininet` is linked in** — nothing else in the
 system directory (which also holds a second Ryu and a setuptools) becomes visible
 to conda.
 
@@ -190,7 +190,7 @@ pip install ./src/ryu --no-build-isolation
 python scripts/patch_ryu.py
 ```
 
-**Not `pip install ryu`.** The last PyPI release is 4.34 from 2020, which predates
+**`pip install ryu` cannot be used.** The last PyPI release is 4.34 from 2020, which predates
 eventlet 0.30.3 removing `ALREADY_HANDLED`; installing it gives you a package that
 imports and then dies. Upstream master carries the compatibility fix and has never
 been released, so the git tree is the only working source.
@@ -217,18 +217,13 @@ Verify at any time:
 python scripts/patch_ryu.py --check      # exit 0 = patched
 ```
 
-> **This is the failure worth guarding against.** A missing patch raises nothing.
-> Every link delay reads 0, training optimises against a constant, and the run
-> looks healthy from start to finish. Check before a long run, not after.
-
 
 ### 2.4 Controller path
 
 `config/controller/simple_monitor_config.py` spawns `ryu-manager` inside a conda
-env, and the same file supplies the env the DRL agent runs in. **`conda_env` and
-`conda_sh` are the only two machine-specific values in the repository** — set
-them to the env you built in §2.2, whatever it is called. Everything else is
-derived from the file's own location and needs no editing.
+env, and the same file supplies the env the DRL agent runs in. `conda_env` and `conda_sh` are the only two machine-specific values in the
+repository; set them to the env built in §2.2. Everything else is derived from
+the file's own location and needs no editing.
 
 The env named there has to hold torch *and* the patched Ryu, since both children
 are started inside it.
@@ -244,8 +239,8 @@ python dataset/prepare_dataset.py --topology geant  --tms 24tm --tm_scale 3
 
 ### 2.6 Where the installed files land
 
-Three things are installed by now, and they land in different places. Worth
-knowing on a shared machine.
+The three installed components land in different places, which matters on a
+shared machine.
 
 | Component | Path | Installed into |
 | --- | --- | --- |
@@ -329,8 +324,10 @@ test_single_tm.py        Evaluate one traffic matrix (real Mininet)
 
                          --- not on the paper path, kept for reference ---
 test_sim_only.py         Simulator-side evaluation. UNMAINTAINED, see below.
-test_single_tm_udp.py    UDP-probe measurement experiment, not the delay/loss
-                         method the paper uses. One-off, never rerun.
+test_single_tm_udp.py    UDP-probe measurement, not the delay/loss
+                         method the paper uses. Its measurements back the
+                         LLDP-bias comparison in
+                         docs/delay_measurement_issues.md.
 
 algs/                    Agents. stride.py is the main method; the rest are baselines.
                          algs/__init__.py holds the REGISTRY that maps --alg to a class.
@@ -367,9 +364,10 @@ open from then on, and you never type it again:
 
 ```bash
 echo 'PY="$HOME/miniconda3/envs/stride/bin/python"' >> ~/.bashrc
-``` The repository scripts
-resolve the interpreter from `$HOME` the same way, so they work unchanged on any
-machine and user account.
+```
+
+The repository scripts resolve the interpreter from `$HOME` the same way, so they
+work unchanged on any machine and user account.
 
 ### Real Mininet is the supported path
 
@@ -407,7 +405,7 @@ The archive lands in
 `results/stride/runs/nodiff_32node_s18_<date>_<time>/train/`. Both variables are
 optional: they default to `base` and `17`.
 
-Every part of that line is load-bearing:
+What each part of the command does:
 
 | Part | Why |
 | --- | --- |

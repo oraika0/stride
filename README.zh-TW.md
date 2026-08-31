@@ -98,11 +98,11 @@ pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 \
 pip install -r requirements.txt
 ```
 
-#### 誰用哪個 Python，誰去哪裡找 Mininet
+#### 直譯器與 Mininet 的對應
 
-**Mininet 的套件檔案只有一份**，在系統的 `dist-packages`。我們沒有複製它，也沒有在 conda 裡另外裝一份。要處理的只有「conda 的直譯器找不找得到那一份」。
+Mininet 的套件檔案只有一份，位於系統的 `dist-packages`，不會被複製，也不會在 conda 裡另外裝一份。需要處理的是 conda 直譯器能否找到它。
 
-| 誰 | 用哪個 Python | 怎麼找到 Mininet |
+| 元件 | 直譯器 | Mininet 來源 |
 | --- | --- | --- |
 | `mn`、`sudo mn -c` 這些命令列工具 | 系統的 `/usr/bin/python3` | 本來就在它的搜尋路徑裡，不用處理 |
 | 這個 repo 的 `main.py` | **conda 的** `envs/stride/bin/python` | 要靠一個 symlink 接過去 |
@@ -124,7 +124,7 @@ python -c "from mininet.net import Mininet; from mininet.link import TCLink; \
 
 `ln` 是建連結的指令。`-s` 建 symbolic link（捷徑，指向另一個路徑），`-f` 是目標已經存在就覆蓋掉，`-n` 是目標本身若為指向目錄的捷徑就直接換掉它、而不是鑽進去建在裡面。所以這一行是「在 conda 的 `site-packages/` 裡放一個叫 `mininet` 的捷徑，指到系統那份」，之後 conda 的 Python `import mininet` 就會走到系統的實體檔案。第二個指令是驗證，印出 `ok` 才算成功。
 
-`sys.path` 一個字都沒改，只是清單上原本就有的 `site-packages/` 目錄裡多了一個項目。**接進來的只有 `mininet` 這一個套件**，系統目錄裡的其他東西（那裡還有另一份 Ryu 跟 setuptools）不會被 conda 看到。
+這個做法不修改 `sys.path`，只是在清單上原本就有的 `site-packages/` 目錄裡新增一個項目。**接進來的只有 `mininet` 這一個套件**，系統目錄裡的其他東西（那裡還有另一份 Ryu 跟 setuptools）不會被 conda 看到。
 
 > **這個捷徑在 conda 環境裡面。** `conda env remove -n stride` 之後重建環境，它會跟著環境一起消失，要再跑一次上面那兩行。系統那邊的 Mininet 不受影響，不用重裝。漏掉的話每次 real 實驗都會中止於 `from mininet.net import Mininet`。
 
@@ -145,7 +145,7 @@ pip install ./src/ryu --no-build-isolation
 python scripts/patch_ryu.py
 ```
 
-**不是 `pip install ryu`。** PyPI 上最後一版是 2020 年的 4.34，早於 eventlet 0.30.3
+**不能使用 `pip install ryu`。** PyPI 上最後一版是 2020 年的 4.34，早於 eventlet 0.30.3
 移除 `ALREADY_HANDLED`，裝下去會得到一個能安裝但無法 import 的套件。上游 master
 有相容性修正，但之後再也沒發布過，所以 git tree 是唯一能用的來源。
 
@@ -167,16 +167,12 @@ idempotent 的，會把未改動的檔案留成 `switches.py.orig`，`--revert` 
 python scripts/patch_ryu.py --check      # exit 0 = 已 patch
 ```
 
-> **這是最值得防的一種失敗。** 少了 patch **不會有任何錯誤**。每條 link 的延遲都讀成
-> 0，訓練對著一個常數最佳化，而整個過程看起來一切正常。長時間訓練之前先檢查，不要
-> 事後才發現。
-
 
 ### 2.4 Controller 路徑
 
 `config/controller/simple_monitor_config.py` 會在 conda 環境裡啟動 `ryu-manager`。
-`conda_env` 與 `conda_sh` 是**整個 repo 裡僅有的兩個機器相關設定值**，設成你在 §2.2
-建的環境即可，叫什麼名字都行。其餘路徑都從檔案自身位置推導，不需要修改。
+`conda_env` 與 `conda_sh` 是本 repo 僅有的兩個機器相關設定值，設為 §2.2 建立的環境
+名稱即可。其餘路徑皆由檔案自身位置推導，不需修改。
 
 那個環境必須同時裝有 torch 與 patch 過的 Ryu，因為兩個子行程都在裡面啟動。
 
@@ -191,7 +187,7 @@ python dataset/prepare_dataset.py --topology geant  --tms 24tm --tm_scale 3
 
 ### 2.6 安裝後的檔案落點
 
-到這裡三個東西裝完了，各自落在不同地方。在共用機器上值得知道。
+安裝完成後，三個元件分別落在不同位置。在共用機器上需要留意。
 
 | 元件 | 路徑 | 安裝位置 |
 | --- | --- | --- |
@@ -263,8 +259,8 @@ test_single_tm.py        對單一 traffic matrix 做評估（真實 Mininet）
 
                          --- 以下不在論文主線上，保留供參考 ---
 test_sim_only.py         模擬側評估。已無維護，見 §4。
-test_single_tm_udp.py    UDP 探針量測實驗，不是論文採用的 delay/loss 方法。
-                         一次性的嘗試，之後沒有再跑過。
+test_single_tm_udp.py    UDP 探針量測，非論文採用的 delay/loss 方法。量測結果用於
+                         docs/delay_measurement_issues.md 的 LLDP 偏差比較。
 
 algs/                    各演算法。stride.py 是主方法，其餘為 baseline。
                          algs/__init__.py 的 REGISTRY 把 --alg 對應到類別。
@@ -299,8 +295,10 @@ A-Traffic-.../           vendored 的 Enero/RouteNet 程式碼。只用到 SAC_P
 
 ```bash
 echo 'PY="$HOME/miniconda3/envs/stride/bin/python"' >> ~/.bashrc
-```repo 內的腳本用同樣的慣例，都從 `$HOME` 推導直譯器
-路徑，所以換機器、換使用者帳號都不用改。
+```
+
+repo 內的腳本用同樣的慣例，都從 `$HOME` 推導直譯器路徑，所以換機器、換使用者帳號
+都不用改。
 
 ### 真實 Mininet 是唯一維護中的路徑
 
@@ -333,7 +331,7 @@ sudo -E "STRIDE_VARIANT=nodiff" "$PY" main.py \
 歸檔會寫進 `results/stride/runs/nodiff_32node_s18_<date>_<time>/train/`。兩個變數都
 可以省略，預設是 `base` 與 `17`。
 
-這行指令的每個部分都有其存在理由。
+指令各部分的作用如下。
 
 | 部分 | 原因 |
 | --- | --- |
