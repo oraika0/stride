@@ -2074,12 +2074,23 @@ def check_controller_alive(config, step):
         check_controller_alive.digest = digest
         check_controller_alive.same = 0
     if check_controller_alive.same >= limit:
+        # Write the sentinel before raising. env_loader.start_traffic cycles TMs
+        # until it appears, so an agent that dies without writing it leaves the
+        # traffic generator looping and main.py waiting on it -- the hang this
+        # file already documents at the normal-completion sentinel below.
+        try:
+            with open(f"./results/{config['algs_name']}/.drl_done", "w") as fh:
+                fh.write(f"aborted at step {step}: {name} stopped changing\n")
+        except OSError:
+            pass
         raise RuntimeError(
             f"[monitor] {name} has been byte-identical for "
             f"{check_controller_alive.same + 1} reads in a row, ending at step "
             f"{step}. The controller has stopped measuring and every step from "
             f"here would train against a frozen snapshot. Stopping now rather "
-            f"than at the end of the run. See docs/controller_stops_measuring.md"
+            f"than at the end of the run. The results under "
+            f"results/{config['algs_name']}/ are left unarchived for inspection. "
+            f"See docs/controller_stops_measuring.md"
         )
 
 

@@ -268,6 +268,11 @@ def main():
         # The actual ryu-manager process inside the terminal — kill explicitly.
         subprocess.run(["sudo", "pkill", "-f", "ryu-manager"], check=False)
         print("[main] Cleanup done (Mininet stopped, ryu-manager killed).")
+        # Cleanup first, exit status second: scripts/run_chain.sh reads this to
+        # decide whether to go on and test the checkpoint, and a run the agent
+        # aborted must not be tested.
+        if drl_status not in (None, 0):
+            raise SystemExit(drl_status)
     else:
         # SimpleNamespace 給 training()
         # drl_proc = spawn_drl(merged_cfg, args.mode)
