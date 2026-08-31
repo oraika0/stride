@@ -10,6 +10,7 @@ import torch
 from utils import setting
 from utils import atomic_io
 import copy
+import hashlib
 import os
 import time
 import csv
@@ -369,6 +370,7 @@ def training(config):
             # ==== get state ====
             if (config.get("sim_training", False) == False):
                 state, mlu, global_state = get_state(config, mask, link_indices, step=step)
+                check_controller_alive(config, step)
             else:
                 tm_index = (step // tm_duration_steps) % len(config["tm_list_train"])
                 # mod 是因為 tm_duration_step 可能會不是整數被裁小 如果不用 mod 循環可能會爆出 tm_list_train
@@ -2033,6 +2035,52 @@ def extract_per_pair_reward(all_reward, actions, config, all_reward_indicator=No
             "loss": np.array(loss_vec, dtype=np.float32),
         }
     return np.array(r_vec, dtype=np.float32), components
+
+
+def check_controller_alive(config, step):
+    """Stop the run when the controller's measurement file stops changing.
+
+    The agent reads results/<alg>/net_info_directed.csv once per step. If the
+    monitor greenthread dies the file keeps its last contents, nothing raises,
+    the step count stays right and the reward curve keeps moving, because the
+    reward follows the action rather than the network. One run found this way
+    spent 2988 of 3009 steps reading a file written ten hours earlier. See
+    docs/controller_stops_measuring.md.
+
+    Under live traffic two consecutive cycles never write a byte-identical file:
+    every directed link carries a remaining-bandwidth, queue-delay and loss
+    figure, and all of them would have to repeat at once. A repeat is therefore
+    the controller, not the network.
+
+    Two knobs, both on the env config:
+      stall_abort_steps  identical reads that end the run (0 disables the check)
+      stall_grace_steps  steps skipped at the start, before traffic ramps up --
+                         an idle network does produce identical files
+    """
+    limit = int(config.get("stall_abort_steps", 5))
+    if limit <= 0 or step <= int(config.get("stall_grace_steps", 10)):
+        return
+    name = ("net_info_directed.csv" if config.get("state_directed", False)
+            else "net_info.csv")
+    path = f"./results/{config['algs_name']}/{name}"
+    try:
+        with open(path, "rb") as fh:
+            digest = hashlib.md5(fh.read()).hexdigest()
+    except OSError:
+        return                      # mid-write; get_state already retries reads
+    if digest == getattr(check_controller_alive, "digest", None):
+        check_controller_alive.same = getattr(check_controller_alive, "same", 0) + 1
+    else:
+        check_controller_alive.digest = digest
+        check_controller_alive.same = 0
+    if check_controller_alive.same >= limit:
+        raise RuntimeError(
+            f"[monitor] {name} has been byte-identical for "
+            f"{check_controller_alive.same + 1} reads in a row, ending at step "
+            f"{step}. The controller has stopped measuring and every step from "
+            f"here would train against a frozen snapshot. Stopping now rather "
+            f"than at the end of the run. See docs/controller_stops_measuring.md"
+        )
 
 
 def get_state(config, masks, link_indices, step=None): # get the current network state

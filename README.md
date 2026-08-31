@@ -465,8 +465,9 @@ inside tmux; the controller and the agent open additional windows.
 
 A run whose controller stopped measuring partway still produces a full step
 count, a saved checkpoint and a reward curve that keeps moving, because the
-reward follows the action rather than the network. Whether measurements keep
-landing has to be watched while the run is in progress, not afterwards. See
+reward follows the action rather than the network. The training loop compares
+the measurement file it reads each step and stops the run after five
+byte-identical reads, rather than letting the whole chain finish. See
 [`docs/controller_stops_measuring.md`](docs/controller_stops_measuring.md).
 
 ### Shutdown
@@ -737,8 +738,9 @@ dataset/extend_k_paths.py        build a K=30 candidate file while preserving th
   `sudo -E "VAR=value" python ...` form.
 - **The controller can stop updating its measurements mid-run**, and the run
   still completes every step, saves a checkpoint and draws a reward curve that
-  keeps moving. Confirm measurements are still landing while the run is in
-  progress. See
+  keeps moving. The training loop compares the measurement file it reads each
+  step and stops after five byte-identical reads (`stall_abort_steps`, 0 to
+  disable). See
   [`docs/controller_stops_measuring.md`](docs/controller_stops_measuring.md).
 
 ---
