@@ -633,7 +633,7 @@ Regenerating everything:
 "$PY" paper/figures/dataset/make_dataset_figs.py           # Fig 6-11
 "$PY" paper/figures/dataset/make_demand_concentration.py   # Fig 12
 
-# tables and theoretical bounds
+# tables
 "$PY" paper/figures/k_ablation/make_k_fig.py               # Table 13
 "$PY" paper/bounds/k_oracle_curve.py                       # Table 12
 "$PY" paper/tables/build_paper_table.py                    # LP/ILP comparison

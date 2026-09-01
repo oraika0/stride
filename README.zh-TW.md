@@ -534,7 +534,7 @@ session 結束時寫下的歸檔，旁邊的其他目錄都是即時交換區。
 "$PY" paper/figures/dataset/make_dataset_figs.py           # 圖 6-11
 "$PY" paper/figures/dataset/make_demand_concentration.py   # 圖 12
 
-# 表與理論界
+# 表
 "$PY" paper/figures/k_ablation/make_k_fig.py               # 表 13
 "$PY" paper/bounds/k_oracle_curve.py                       # 表 12
 "$PY" paper/tables/build_paper_table.py                    # LP/ILP 比較表
