@@ -621,9 +621,6 @@ Which generator produces which figure or table is listed in
 Regenerating everything:
 
 ```bash
-# the reward figures read this cache, so it goes first
-"$PY" paper/figures/reward/make_curves_csv.py
-
 # figures
 "$PY" paper/figures/reward/make_reward_fig.py              # Fig 13, 15
 "$PY" paper/figures/reward/make_reward_components_fig.py   # Fig 16

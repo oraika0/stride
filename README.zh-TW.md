@@ -522,9 +522,6 @@ session 結束時寫下的歸檔，旁邊的其他目錄都是即時交換區。
 一次重新產生全部：
 
 ```bash
-# reward 系列的圖依賴這份快取，要先跑
-"$PY" paper/figures/reward/make_curves_csv.py
-
 # 圖
 "$PY" paper/figures/reward/make_reward_fig.py              # 圖 13、15
 "$PY" paper/figures/reward/make_reward_components_fig.py   # 圖 16
