@@ -431,7 +431,7 @@ training happened to finish last, and the session records no way to tell which.
 Either pass `--model`, or read the `ckpt.txt` the session writes: it holds the
 resolved path and a sha256 per checkpoint file.
 
-OSPF, ILP, widest-path and DRSIR have nothing to evaluate from, so they are run
+OSPF, ILP and DRSIR have nothing to evaluate from, so they are run
 without `--model` and become runs of their own.
 
 ### The whole chain in one command
@@ -509,18 +509,12 @@ names to keep in sync — dropping `config/env/mytopo_config.py` into the tree i
 what makes `--env mytopo` work, and deleting the file is what removes it.
 `main.py` then merges the three dicts into one and hands it to `run_drl.py`.
 
-So the keys available are exactly the files present:
-
-```bash
-ls config/env config/algs config/controller | sed 's/_config\.py//'
-```
-
 At the time of writing:
 
 - **env**: `geant`, `geant_directed`, `32node_24tm`, `32node_144tm`,
   `32node_144tm_directed`, `32node_144tm_directed_k30`
 - **alg**: `stride`, `ls2ic`, `ls2ic_dd`, `ps_dqn`, `ps_dqn_a`, `ps_dqn_dd`,
-  `drsir`, `drsir_dd`, `ospf`, `widest_path`, `ilp`
+  `drsir`, `drsir_dd`, `ospf`, `ilp`
 - **ctrl**: `simple_monitor`
 
 The seed is not part of any of these. It is `--seed` on the command line, for
@@ -757,15 +751,9 @@ system-level, and everyone else on the machine uses the same copy.
 ### 11.1 Confirm the experiment data is backed up
 
 `results/*/runs/` holds the complete archive of every run — training logs, test
-sessions, checkpoints. It is tracked in git, but **only what has been pushed
-exists anywhere else**.
-
-```bash
-cd ~/stride && git status --short && git log --oneline origin/main..HEAD
-```
-
-Continue only if both print nothing. Any output means something still exists
-only on this machine.
+sessions, checkpoints. **The runs that came with the repository travel with git.
+Runs you produced on this machine do not.** Copy anywhere you still want them
+before `rm -rf` takes them.
 
 ### 11.2 Stop the running processes
 

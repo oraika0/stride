@@ -355,7 +355,7 @@ sudo -E "$PY" test_single_tm.py --env 32node_144tm_directed --alg stride --auto 
 `--model`，要嘛去看 session 寫下的 `ckpt.txt`，裡面有解析後的路徑與每個 checkpoint
 檔案的 sha256。
 
-OSPF、ILP、widest-path 與 DRSIR 沒有 checkpoint 可讀，因此不帶 `--model` 執行，各自
+OSPF、ILP 與 DRSIR 沒有 checkpoint 可讀，因此不帶 `--model` 執行，各自
 成為獨立的 run。
 
 ### 一行跑完整條流程
@@ -421,18 +421,12 @@ reward 曲線，因為 reward 跟著 action 走，不是跟著網路走。訓練
 需要同步維護。把 `config/env/mytopo_config.py` 放進目錄，`--env mytopo` 就能用。把檔案
 刪掉，那個 key 就消失。`main.py` 接著把三個 dict 合併成一個交給 `run_drl.py`。
 
-所以可用的 key 就等於目錄裡實際有哪些檔案。
-
-```bash
-ls config/env config/algs config/controller | sed 's/_config\.py//'
-```
-
 撰寫當下是。
 
 - **env**：`geant`、`geant_directed`、`32node_24tm`、`32node_144tm`、
   `32node_144tm_directed`、`32node_144tm_directed_k30`
 - **alg**：`stride`、`ls2ic`、`ls2ic_dd`、`ps_dqn`、`ps_dqn_a`、`ps_dqn_dd`、
-  `drsir`、`drsir_dd`、`ospf`、`widest_path`、`ilp`
+  `drsir`、`drsir_dd`、`ospf`、`ilp`
 - **ctrl**：`simple_monitor`
 
 seed 不屬於上面任何一層，它是命令列的 `--seed`，對所有演算法一視同仁。
@@ -629,13 +623,8 @@ Open vSwitch 是系統層級的，這台機器上的其他人也在用同一份�
 ### 11.1 確認實驗資料已備份
 
 `results/*/runs/` 底下是每一次 run 的完整歸檔——訓練 log、測試 session、checkpoint。
-它有進 git，但**只有推上去的部分才在別的地方**。
-
-```bash
-cd ~/stride && git status --short && git log --oneline origin/main..HEAD
-```
-
-兩個都沒有輸出才往下走。有輸出就是還有東西只存在這台機器上。
+**repo 裡原本就有的那些跟著 git 走，但你在這台機器上跑出來的沒有。** 還要的話先複製到
+別的地方，`rm -rf` 之後就沒了。
 
 ### 11.2 停止執行中的行程
 

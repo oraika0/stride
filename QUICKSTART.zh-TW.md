@@ -267,7 +267,7 @@ results/stride/runs/base_32node_s17_<date>_<time>/test/<date>_<time>/
 要讀 `real_directed_test/<tm_id>_eval_metrics.csv`。undirected 那組會把一條 link 雙向的
 容量加總，藏住單方向的飽和。
 
-沒有 checkpoint 可載的 baseline（`ospf`、`ilp`、`widest_path`、`drsir`）本來就不用給
+沒有 checkpoint 可載的 baseline（`ospf`、`ilp`、`drsir`）本來就不用給
 `--model`。它們的 run 目錄只有 `test/` 沒有 `train/`，那正是「沒有訓練階段的 run」該有的
 樣子。
 
@@ -322,14 +322,8 @@ run 的目錄名就是重現它的指令：`base_32node_s17_...` 等於 `STRIDE_
 
 ### repo 與環境
 
-**先確認實驗資料還在別的地方。** `results/*/runs/` 是每次 run 的完整歸檔，有進 git，
-但只有推上去的部分才在別的地方。
-
-```bash
-cd ~/stride && git status --short && git log --oneline origin/main..HEAD
-```
-
-兩個都沒有輸出才往下。接著停掉還在跑的東西。
+**先確認實驗資料還在別的地方。** `results/*/runs/` 是每次 run 的完整歸檔。repo 帶來的
+那些跟著 git 走，你自己跑出來的沒有 —— 還要的話先複製走。接著停掉還在跑的東西。
 
 ```bash
 sudo mn -c

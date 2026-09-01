@@ -295,7 +295,7 @@ results/stride/runs/base_32node_s17_<date>_<time>/test/<date>_<time>/
 Read `real_directed_test/<tm_id>_eval_metrics.csv`. The undirected variants sum a
 link's capacity across both directions and hide one-way saturation.
 
-Baselines with nothing to load (`ospf`, `ilp`, `widest_path`, `drsir`) are run
+Baselines with nothing to load (`ospf`, `ilp`, `drsir`) are run
 without `--model` by design. Their run directories hold a `test/` and no `train/`,
 which is what a run with no training phase looks like.
 
@@ -358,14 +358,9 @@ safe on a shared machine. The second is not.
 ### The repository and the environment
 
 **Confirm the experiment data exists somewhere else first.** `results/*/runs/`
-is the complete archive of every run. It is tracked in git, but only what has
-been pushed exists anywhere else.
-
-```bash
-cd ~/stride && git status --short && git log --oneline origin/main..HEAD
-```
-
-Continue only if both print nothing. Then stop what is still running.
+is the complete archive of every run. The ones that came with the repository
+travel with git; the ones you produced here do not. Copy anything you still
+want. Then stop what is still running.
 
 ```bash
 sudo mn -c
