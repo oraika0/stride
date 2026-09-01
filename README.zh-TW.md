@@ -559,9 +559,13 @@ log 併進已經版控的 `timing_steps.csv`。
 訓練 log。reward 系列的圖是例外，它們讀的是訓練 log，透過
 `paper/figures/reward/make_curves_csv.py` 產生的兩個 CSV。
 
-那支腳本從 `results/*/runs/*/train/` 底下的 `output_*.txt` 重建 `train_curves.csv` 跟
-`components.csv`。那些 txt 才是每次訓練的**原始紀錄**。CSV 掉了或是新增了 run 就重跑
-一次，對應關係寫在腳本裡的 `RUN_MAP`。`paper/` 底下的程式都不需要網路。
+那兩個 CSV 從 `results/*/runs/*/train/` 底下的 `output_*.txt` 重建，那些 txt 才是每次
+訓練的**原始紀錄**。**不需要自己先跑 `make_curves_csv.py`** —— 兩支圖腳本每次執行都會呼叫
+它重算一次。重算只要零點幾秒，比判斷「這次需不需要重算」還便宜，而且擋掉了一種安靜的
+錯誤：圖畫出一份比它宣稱的 run 還舊的 CSV，卻什麼都不說。
+
+要動的只有 `make_curves_csv.py` 裡的 `RUN_MAP`，新增 run 時把它加進去。那支腳本仍然可以
+單獨執行，兩個 CSV 照樣會寫出來。`paper/` 底下的程式都不需要網路。
 
 ---
 

@@ -11,10 +11,10 @@ network or a Weights & Biases account.
 
 | # | Generator | Reads | Note |
 | --- | --- | --- | --- |
-| Fig 13. Training reward on GÉANT | [`figures/reward/make_reward_fig.py`](figures/reward/make_reward_fig.py) | `train_curves.csv` ← [`make_curves_csv.py`](figures/reward/make_curves_csv.py) ← `results/*/train/output_all.txt` | — |
+| Fig 13. Training reward on GÉANT | [`figures/reward/make_reward_fig.py`](figures/reward/make_reward_fig.py) | `results/*/train/output.txt`, via [`make_curves_csv.py`](figures/reward/make_curves_csv.py) which the generator calls itself | — |
 | Fig 14. Performance evaluation in GÉANT | [`figures/holdout/make_holdout_fig.py`](figures/holdout/make_holdout_fig.py) | `results/*/test/<session>/real/<tm>/` | — |
 | Fig 15. Training reward on 32-node | `figures/reward/make_reward_fig.py` | as Fig 13 | — |
-| Fig 16. Reward components on 32-node | [`figures/reward/make_reward_components_fig.py`](figures/reward/make_reward_components_fig.py) | `components.csv` ← `make_curves_csv.py` | [`te_objective_design.md`](../docs/te_objective_design.md) |
+| Fig 16. Reward components on 32-node | [`figures/reward/make_reward_components_fig.py`](figures/reward/make_reward_components_fig.py) | same, via `make_curves_csv.py` | [`te_objective_design.md`](../docs/te_objective_design.md) |
 | Fig 17. Performance evaluation in 32-node | `figures/holdout/make_holdout_fig.py` | `results/*/test/` | — |
 | Fig 18. Denoise-step performance on 32-node | [`figures/denoise_step/make_denoise_step_fig.py`](figures/denoise_step/make_denoise_step_fig.py) | `results/stride/test/` | — |
 | Fig 19. Ablation performance on 32-node | [`figures/ablation/make_ablation_fig.py`](figures/ablation/make_ablation_fig.py) | `results/stride/test/` | — |
