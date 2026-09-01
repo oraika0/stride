@@ -491,8 +491,7 @@ seed 不屬於上面任何一層，它是命令列的 `--seed`，對所有演算
 STRIDE_VARIANT=M4 "$PY" main.py --env 32node_144tm_directed --alg stride --seed 18 train
 ```
 
-論文每一列數字對應的完整指令，在
-[`QUICKSTART.zh-TW.md`](QUICKSTART.zh-TW.md) 最後一節「論文用到的每一次 run」，一列一行。
+論文每一列數字對應的完整指令在最後一節「論文用到的每一次 run」，一列一行。
 
 
 ---
@@ -736,3 +735,84 @@ ip -br link | grep -E "^(s[0-9]|ovs)"   # 不該有殘留介面
 
 四項都符合就乾淨了。`ip -br link` 還有 `s1`、`s2` 之類的介面，代表 11.2 的
 `sudo mn -c` 沒跑或跑失敗，補跑一次。
+
+---
+
+## 論文用到的每一次 run
+
+一列一行指令。每一行都是完整的 chain —— clean、訓練、clean、測試、clean —— 所以一列
+是一個結果，不是一個步驟。如果 update 在你的卡上塞不進 10 秒，在任何一行前面加
+`STRIDE_CHUNK=<n>`（見 §5），它不會改變產出。
+
+下面每一行都是 **seed 17**，也就是預設值。要跑第二個 seed，三個位置參數都要寫出來，
+`18` 放最後 —— seed 是第三個參數，不能跳過前兩個單獨給：
+
+```bash
+STRIDE_VARIANT=M4 ./scripts/run_chain.sh 32node_144tm_directed stride 18
+```
+
+### STRIDE 與被比較的各方法
+
+圖 14、圖 17、表 8、表 9。
+
+其中三個會訓練，所以用 chain：
+
+| 方法 | 32-node | GÉANT |
+| --- | --- | --- |
+| STRIDE | `./scripts/run_chain.sh` | `./scripts/run_chain.sh geant_directed stride` |
+| LS2IC | `./scripts/run_chain.sh 32node_144tm_directed ls2ic_dd` | `./scripts/run_chain.sh geant_directed ls2ic_dd` |
+| MADQN | `./scripts/run_chain.sh 32node_144tm_directed ps_dqn_dd` | `./scripts/run_chain.sh geant_directed ps_dqn_dd` |
+
+**另外三個完全沒有訓練階段**，沒有 checkpoint 可以給 test 指，chain 用不上 —— 它會在
+檢查 `train/model` 那一步中止。直接跑評估、不帶 `--model`，它自己就會成為一個 run：
+
+| 方法 | 32-node | GÉANT |
+| --- | --- | --- |
+| DRSIR | `sudo -E "$PY" test_single_tm.py --env 32node_144tm_directed --alg drsir_dd --auto` | `sudo -E "$PY" test_single_tm.py --env geant_directed --alg drsir_dd --auto` |
+| OSPF | `sudo -E "$PY" test_single_tm.py --env 32node_144tm_directed --alg ospf --auto` | `sudo -E "$PY" test_single_tm.py --env geant_directed --alg ospf --auto` |
+| ILP | `sudo -E "$PY" test_single_tm.py --env 32node_144tm_directed --alg ilp --auto` | `sudo -E "$PY" test_single_tm.py --env geant_directed --alg ilp --auto` |
+
+歸檔的 run 就看得出來：`results/ospf/runs/<run>/` 底下只有 `test`，而 STRIDE 的 run 底下是
+`test` 加 `train`。每次跑之前自己先跑一次 `clean.sh`，因為沒有別的東西會幫你跑。
+
+OSPF 與 ILP 是確定性的，只跑一個 seed。DRSIR 是在評估過程中邊跑邊學，所以它沒有獨立的
+訓練階段。
+
+LS2IC、MADQN、DRSIR 要用 `_dd` 版本。無向版（`ls2ic`、`ps_dqn`、`drsir`）讀的是把兩個
+方向加總過的鏈路指標，會蓋掉單方向的飽和，不是論文拿來比較的對象。
+
+### 去噪步數 M
+
+圖 18、表 10。M=8 是主線設定，所以它是上面的 STRIDE 那一列，不在這裡重複。
+
+| M | 指令 |
+| --- | --- |
+| 4 | `STRIDE_VARIANT=M4 ./scripts/run_chain.sh` |
+| 6 | `STRIDE_VARIANT=M6 ./scripts/run_chain.sh` |
+| 10 | `STRIDE_VARIANT=M10 ./scripts/run_chain.sh` |
+| 12 | `STRIDE_VARIANT=M12 ./scripts/run_chain.sh` |
+
+### 候選路徑數 K
+
+表 13。K=20 是主線設定。**K=25 與 K=30 要換 `--env`**：
+`dataset/32node_traffic/k_paths.json` 每個 pair 剛好 20 條路徑，所以 K=10 與 K=15 是它的
+前綴，不需要新東西；K=25 與 K=30 要的比檔案裡有的還多，改讀 `k_paths_k30_ext.json`。
+用更大的 K 重新產生 `k_paths.json` 會讓同分的路徑重新排序，等於默默改掉 K=20 的定義，
+所以延伸檔另外放，並且用另一個 env 指向它。
+
+| K | 指令 |
+| --- | --- |
+| 10 | `STRIDE_VARIANT=k10 ./scripts/run_chain.sh` |
+| 15 | `STRIDE_VARIANT=k15 ./scripts/run_chain.sh` |
+| 25 | `STRIDE_VARIANT=k25 ./scripts/run_chain.sh 32node_144tm_directed_k30 stride` |
+| 30 | `STRIDE_VARIANT=k30 ./scripts/run_chain.sh 32node_144tm_directed_k30 stride` |
+
+### 元件消融
+
+圖 19、表 11。每一個只拿掉 STRIDE 的一個部分，其餘不動。
+
+| 拿掉的部分 | 指令 | 做了什麼 |
+| --- | --- | --- |
+| encoder | `STRIDE_VARIANT=flatfc_nomask ./scripts/run_chain.sh` | 用扁平 `Linear` 取代 attention + PMA，並且 pair mask 全為 1，於是每個 pair 都看到完整的全域鏈路狀態，只剩 per-pair head 能區分它們 |
+| diffusion | `STRIDE_VARIANT=nodiff ./scripts/run_chain.sh` | 只解碼一次，且不做去噪步數條件化 |
+| actor 梯度 | `STRIDE_VARIANT=critic ./scripts/run_chain.sh` | encoder 只由 critic 塑形 |

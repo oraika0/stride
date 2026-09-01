@@ -583,8 +583,8 @@ the seed from `--seed`.
 STRIDE_VARIANT=M4 "$PY" main.py --env 32node_144tm_directed --alg stride --seed 18 train
 ```
 
-The full command behind every row the paper reports is in
-[`QUICKSTART.md`](QUICKSTART.md), last section, one line each.
+The full command behind every row the paper reports is in the last section, one
+line each.
 
 
 ---
@@ -876,3 +876,93 @@ ip -br link | grep -E "^(s[0-9]|ovs)"   # no leftover interfaces
 All four clear means the machine is clean. Interfaces like `s1` or `s2` still in
 `ip -br link` mean `sudo mn -c` in 11.2 did not run or did not succeed — run it
 again.
+
+---
+
+## Every run the paper reports
+
+One command per row. Each is the whole chain — clean, train, clean, test, clean
+— so a row is a result, not a step. Prepend `STRIDE_CHUNK=<n>` to any of them if
+the update does not fit in 10 s on your card (see §5); it changes nothing about
+what is produced.
+
+Every row below is **seed 17**, the default. For the second seed, spell all three
+positional arguments out and put `18` last — the seed is the third argument, so
+it cannot be given without the two before it:
+
+```bash
+STRIDE_VARIANT=M4 ./scripts/run_chain.sh 32node_144tm_directed stride 18
+```
+
+### STRIDE and the methods it is compared against
+
+Figures 14 and 17, Tables 8 and 9.
+
+Three of them train, so they take the chain:
+
+| Method | 32-node | GÉANT |
+| --- | --- | --- |
+| STRIDE | `./scripts/run_chain.sh` | `./scripts/run_chain.sh geant_directed stride` |
+| LS2IC | `./scripts/run_chain.sh 32node_144tm_directed ls2ic_dd` | `./scripts/run_chain.sh geant_directed ls2ic_dd` |
+| MADQN | `./scripts/run_chain.sh 32node_144tm_directed ps_dqn_dd` | `./scripts/run_chain.sh geant_directed ps_dqn_dd` |
+
+**The other three have no training phase at all**, so there is no checkpoint for
+a test to point at and the chain is the wrong tool — it would stop at its
+`train/model` check. Run the evaluation directly, without `--model`, and it
+becomes a run of its own:
+
+| Method | 32-node | GÉANT |
+| --- | --- | --- |
+| DRSIR | `sudo -E "$PY" test_single_tm.py --env 32node_144tm_directed --alg drsir_dd --auto` | `sudo -E "$PY" test_single_tm.py --env geant_directed --alg drsir_dd --auto` |
+| OSPF | `sudo -E "$PY" test_single_tm.py --env 32node_144tm_directed --alg ospf --auto` | `sudo -E "$PY" test_single_tm.py --env geant_directed --alg ospf --auto` |
+| ILP | `sudo -E "$PY" test_single_tm.py --env 32node_144tm_directed --alg ilp --auto` | `sudo -E "$PY" test_single_tm.py --env geant_directed --alg ilp --auto` |
+
+Their archived runs show it: `results/ospf/runs/<run>/` contains `test` and
+nothing else, where a STRIDE run contains `test` and `train`. Run `clean.sh`
+before each, since nothing else will.
+
+OSPF and ILP are deterministic and were run at one seed only. DRSIR learns
+during the evaluation itself, which is why it has no separate training phase.
+
+Use `_dd` for LS2IC, MADQN and DRSIR. The undirected variants (`ls2ic`,
+`ps_dqn`, `drsir`) read link metrics aggregated across both directions, which
+hides per-direction saturation and is not what the paper compares against.
+
+### Denoise steps M
+
+Figure 18, Table 10. M=8 is the mainline, so it is the STRIDE row above rather
+than an entry here.
+
+| M | Command |
+| --- | --- |
+| 4 | `STRIDE_VARIANT=M4 ./scripts/run_chain.sh` |
+| 6 | `STRIDE_VARIANT=M6 ./scripts/run_chain.sh` |
+| 10 | `STRIDE_VARIANT=M10 ./scripts/run_chain.sh` |
+| 12 | `STRIDE_VARIANT=M12 ./scripts/run_chain.sh` |
+
+### Candidate-set size K
+
+Table 13. K=20 is the mainline. **K=25 and K=30 need a different `--env`**:
+`dataset/32node_traffic/k_paths.json` holds exactly 20 paths per pair, so K=10
+and K=15 are prefixes of it and need nothing new, while K=25 and K=30 ask for
+more paths than the file contains and read `k_paths_k30_ext.json` instead.
+Regenerating `k_paths.json` at a larger K would reorder ties and silently
+redefine what K=20 means, so the extension is a separate file behind a separate
+env.
+
+| K | Command |
+| --- | --- |
+| 10 | `STRIDE_VARIANT=k10 ./scripts/run_chain.sh` |
+| 15 | `STRIDE_VARIANT=k15 ./scripts/run_chain.sh` |
+| 25 | `STRIDE_VARIANT=k25 ./scripts/run_chain.sh 32node_144tm_directed_k30 stride` |
+| 30 | `STRIDE_VARIANT=k30 ./scripts/run_chain.sh 32node_144tm_directed_k30 stride` |
+
+### Component ablations
+
+Figure 19, Table 11. Each removes one part of STRIDE and changes nothing else.
+
+| Removed | Command | What it does |
+| --- | --- | --- |
+| encoder | `STRIDE_VARIANT=flatfc_nomask ./scripts/run_chain.sh` | flat `Linear` instead of attention + PMA, and an all-ones pair mask, so every pair sees the full global link state and only the per-pair head can tell them apart |
+| diffusion | `STRIDE_VARIANT=nodiff ./scripts/run_chain.sh` | one decode pass, no denoise-step conditioning |
+| actor gradient | `STRIDE_VARIANT=critic ./scripts/run_chain.sh` | the encoder is shaped by the critic alone |
