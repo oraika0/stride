@@ -46,6 +46,24 @@ modinfo openvswitch veth sch_netem              # 有沒有這個模組可以載
 
 ## 2. 安裝
 
+**整段流程建議在 tmux 裡跑。** SSH 斷線不會殺掉安裝，捲軸不會被清掉，而且後面訓練起來
+之後 controller 與 agent 會直接開成同一個 session 的視窗。
+
+```bash
+tmux new -s setup
+```
+
+之後任何時候 `Ctrl-b d` 離開、`tmux attach -t setup` 回來。
+
+取得 repo。
+
+```bash
+git clone git@github.com:oraika0/stride.git ~/stride
+cd ~/stride
+```
+
+沒有設 SSH key 的話改用 `https://github.com/oraika0/stride.git`。
+
 ### 2.1 Mininet + Open vSwitch
 
 兩種裝法，由發行版決定用哪一種，擇一即可。
@@ -200,6 +218,18 @@ python dataset/prepare_dataset.py --topology geant  --tms 24tm --tm_scale 3
 
 **Mininet 的安裝本身兩種方式都是系統層級的。** 它要建 network namespace、要接 Open vSwitch，本來就需要 root，這個 repo 改變不了。在共用 server 上先確認 Mininet 與 OVS 有沒有裝過，不要再裝第二份。
 
+### 2.7 裝完的檢查
+
+三行都要過才往下走。
+
+```bash
+python -c "import torch, mininet; print(torch.__version__, torch.cuda.is_available())"
+python scripts/patch_ryu.py --check
+sudo mn --test pingall
+```
+
+第一行要印出 torch 版本跟 `True`，第二行要印出 `PATCHED`。
+
 ---
 
 ## 3. 架構與目錄結構
@@ -327,6 +357,16 @@ sudo -E "STRIDE_VARIANT=nodiff" "$PY" main.py \
 | `"STRIDE_VARIANT=..."` | 選擇架構。要寫成明確的 `VAR=value` 指派形式，不要只靠 `-E`。這個變數若未傳入，程式會退回 `base` 且不會報錯，訓練的將是另一個架構。 |
 | `--seed` | 選擇 seed，對所有演算法都適用。它是一般參數，`sudo` 不會把它弄丟。不給就是 17。 |
 
+**在 §2 那個 tmux session 裡開一個具名視窗給它**，三個行程就會各佔一個視窗，而你原本
+那個 shell 保持空著可以查東西。
+
+```bash
+tmux new-window -n main "sudo -E \"$PY\" main.py --env 32node_144tm_directed --alg stride train; exec bash"
+```
+
+結尾的 `exec bash` 讓視窗在訓練結束或中止之後留著，錯誤訊息才看得到。視窗之間用
+`Ctrl-b n` 往下一個、`Ctrl-b p` 往前一個、`Ctrl-b w` 列出全部挑一個。
+
 真實模式會印出 `Building topology ...` 接著 `Controller spawned, wait 30 s ...`，
 並各開一個終端機給 controller 與 agent。
 
@@ -450,6 +490,9 @@ seed 不屬於上面任何一層，它是命令列的 `--seed`，對所有演算
 ```bash
 STRIDE_VARIANT=M4 "$PY" main.py --env 32node_144tm_directed --alg stride --seed 18 train
 ```
+
+論文每一列數字對應的完整指令，在
+[`QUICKSTART.zh-TW.md`](QUICKSTART.zh-TW.md) 最後一節「論文用到的每一次 run」，一列一行。
 
 
 ---

@@ -55,6 +55,25 @@ watch the update time the `drl` pane prints to see whether it fits.
 
 ## 2. Installation
 
+**Run all of this inside tmux.** An SSH drop then does not kill the install, the
+scrollback survives, and once training starts the controller and the agent open
+as windows of that same session.
+
+```bash
+tmux new -s setup
+```
+
+`Ctrl-b d` detaches at any point, `tmux attach -t setup` comes back.
+
+Get the repository.
+
+```bash
+git clone git@github.com:oraika0/stride.git ~/stride
+cd ~/stride
+```
+
+Without an SSH key set up, clone `https://github.com/oraika0/stride.git` instead.
+
 ### 2.1 Mininet + Open vSwitch
 
 Two ways, and the distribution decides which. Pick one.
@@ -259,6 +278,18 @@ namespaces and drives Open vSwitch, both of which need root, and this repository
 cannot change that. On a shared server, check whether Mininet and Open vSwitch are
 already installed rather than installing a second copy.
 
+### 2.7 Check the install
+
+All three have to pass before going on.
+
+```bash
+python -c "import torch, mininet; print(torch.__version__, torch.cuda.is_available())"
+python scripts/patch_ryu.py --check
+sudo mn --test pingall
+```
+
+The first prints the torch version and `True`, the second prints `PATCHED`.
+
 ---
 
 ## 3. Architecture and layout
@@ -398,6 +429,17 @@ What each part of the command does:
 | `"$PY"` (absolute path) | `-E` does **not** preserve `PATH` — sudo's `secure_path` replaces it with a fixed system list. So a bare `python` under sudo resolves to the system Python 3.8, which has no torch, no numpy and no ryu. This is also why running `conda activate stride` first does not help: activation only edits `PATH`, and sudo throws `PATH` away. |
 | `"STRIDE_VARIANT=..."` | Picks the architecture. Write it as an explicit `VAR=value` assignment rather than trusting `-E`: if it gets dropped the run silently falls back to `base` and trains the wrong thing with no error. |
 | `--seed` | Picks the seed, for any algorithm. It is an ordinary argument, so `sudo` cannot drop it. Omit it for 17. |
+
+**Give it a named window in the tmux session from §2.** The three processes then
+take a window each and the shell you started from stays free.
+
+```bash
+tmux new-window -n main "sudo -E \"$PY\" main.py --env 32node_144tm_directed --alg stride train; exec bash"
+```
+
+The trailing `exec bash` keeps the window open when training ends or aborts, so
+the error stays readable. `Ctrl-b n` moves to the next window, `Ctrl-b p` to the
+previous, `Ctrl-b w` lists them all.
 
 A real run prints `Building topology ...` followed by
 `Controller spawned, wait 30 s ...` and opens a terminal each for the controller
@@ -540,6 +582,9 @@ the seed from `--seed`.
 ```bash
 STRIDE_VARIANT=M4 "$PY" main.py --env 32node_144tm_directed --alg stride --seed 18 train
 ```
+
+The full command behind every row the paper reports is in
+[`QUICKSTART.md`](QUICKSTART.md), last section, one line each.
 
 
 ---
